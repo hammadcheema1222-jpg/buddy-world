@@ -70,8 +70,7 @@ function M(c,e){const k=c+'|'+(e||'');if(!MC[k])MC[k]=new THREE.MeshLambertMater
 function B(w,h,d,c,x,y,z,p,e){const m=new THREE.Mesh(GB,typeof c==='string'?M(c,e):c);m.scale.set(w,h,d);m.position.set(x,y+h/2,z);(p||scene).add(m);return m;}
 function S(r,c,x,y,z,p,sx,sy,sz,e){const m=new THREE.Mesh(GS,M(c,e));m.scale.set(r*(sx||1),r*(sy||1),r*(sz||1));m.position.set(x,y,z);(p||scene).add(m);return m;}
 function C(r,h,c,x,y,z,p,e){const m=new THREE.Mesh(GC,M(c,e));m.scale.set(r,h,r);m.position.set(x,y+h/2,z);(p||scene).add(m);return m;}
-function grp(p,act){const g=new THREE.Group();(p||scene).add(g);if(act){g.userData.act=act;TAPPABLE.push(g);}return g;}
-const pet={root:null,parts:null,x:1,y:0,z:5,ang:Math.PI,path:[],act:'wander',timer:3,arrived:false,hidden:false,carry:false,happy:0,waveT:0,say:'',sayT:0,chatT:16,yo:0,look:null};
+function grp(p,act){const g=new THREE.Group();(p||scene).add(g);if(act){g.userData.act=act;TAPPABLE.push(g);}return g;}const pet={root:null,parts:null,x:1,y:0,z:5,ang:Math.PI,path:[],act:'wander',timer:3,arrived:false,hidden:false,carry:false,happy:0,waveT:0,say:'',sayT:0,chatT:16,yo:0,look:null};
 function buildPet(){
  if(pet.root)scene.remove(pet.root);
  const cat=kind==='cat',cB=cat?'#f4b469':'#fbfaf5',cD=cat?'#d9893f':'#2c2c2c',cL=cat?'#fff3e2':'#ffffff',limbC=cat?cB:cD;
@@ -122,7 +121,6 @@ function setPose(pose,t,moving){
  P.tail.position.set(0,0.1,-0.28);P.tail.rotation.set(-1.3,0.5+Math.sin(t*2)*0.2,0);
  P.eyes.scale.y=blink?0.15:1;
 }
-
 /* =================== BUDDY CITY: a real city generated from OpenStreetMap =================== */
 const O={lat:51.5007,lon:-0.1246,R:550,left:true,name:'',city:''};
 const KX=()=>111320*Math.cos(O.lat*Math.PI/180),KZ=110540;
@@ -618,6 +616,232 @@ function frame(now){requestAnimationFrame(frame);if(!last)last=now;const dt=Math
  slowT-=dt;if(slowT<=0){slowT=0.5;updateSky();updateSigns();if(CITY){const ll=toLL(pl.mode==='map'?orbit.tx:pl.x,pl.mode==='map'?orbit.tz:pl.z);$('coords').textContent=ll[0].toFixed(5)+', '+ll[1].toFixed(5);}}
  renderer.render(scene,camera);}
 buildPet();updateSky();requestAnimationFrame(frame);
+
+/* ===================== BUDDY WORLD EXTRAS (open-source & open-data integrations) ===================== */
+Object.assign(LAY,{history:false,oldmaps:false,transit:false,news:false,hazards:false,radar:false,nature:true,research:false,radio:false,music:false,overture:false,street:false});
+const X2={};const XL={};const XM={};const artG=new THREE.Group();scene.add(artG);
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function card(title,img,body,link){$('iTitle').textContent=title;$('iImg').innerHTML=img||'';$('iBody').innerHTML=body||'';$('iWiki').innerHTML=link||'';$('iInside').style.display='none';$('info').style.display='flex';}
+function xpin(key,x,z,emo,label,onCard,opt){opt=opt||{};const b=CITY&&CITY.buildingAt(x,z);const h=opt.h!=null?opt.h:(b?b.top+5:6);const g=new THREE.Group();g.position.set(x,0,z);
+ if(!opt.noPole){const pole=new THREE.Mesh(GC,M(opt.pole||'#6b4f2e'));pole.scale.set(0.1,h,0.1);pole.position.y=h/2;g.add(pole);}
+ const lab=labelSprite(label,emo);lab.position.y=h+2;g.add(lab);g.userData.lab=lab;g.userData.card=onCard;g.userData.key=key;g.userData.opt=opt;layerG.add(g);(X2[key]=X2[key]||[]).push(g);return g;}
+function horizon(key,lat,lon,emo,label,onCard){const p=toL(lat,lon),d=Math.hypot(p[0],p[1]);if(d<O.R*1.3)return xpin(key,p[0],p[1],emo,label,onCard);const R=O.R*1.9,k=R/d;
+ const km=d/1000,dir=['N','NE','E','SE','S','SW','W','NW'][Math.round(((Math.atan2(p[0],-p[1])*180/Math.PI)+360)%360/45)%8];return xpin(key,p[0]*k,p[1]*k,emo,label+' · '+(km<10?km.toFixed(1):Math.round(km))+' km '+dir,onCard,{h:40,pole:'#999'});}
+function clearKey(k){(X2[k]||[]).forEach(g=>layerG.remove(g));X2[k]=[];XL[k]=false;}
+function cityName(){return O.cityName||(O.name||'').split(',').pop().trim()||O.name;}
+function nearPoiName(title){if(!CITY)return null;const tl=title.toLowerCase();let best=null;for(const p of CITY.pois){const n=p.t.name;if(n&&n.length>5&&tl.includes(n.toLowerCase())){if(!best||n.length>best.t.name.length)best=p;}}return best;}
+function updX2(){const cam=camera.position,yr=yearU.value;let shown=0;for(const k in X2)for(const g of X2[k]){const o=g.userData.opt;let vis=!!LAY[k];if(vis&&o.y0!=null)vis=yr<2100?(o.y0<=yr&&yr<(o.y1||9999)):(o.y1&&o.y1<2026?false:true);
+  if(k==='history')vis=LAY.history&&o.y0!=null&&(yr>=2100?!o.y1||o.y1>=2026:o.y0<=yr&&yr<(o.y1||9999));g.visible=vis;if(!vis||!g.userData.lab)continue;const d=Math.hypot(g.position.x-cam.x,g.position.z-cam.z);
+  const near=(d<(pl.mode==='map'?Math.max(700,orbit.r*1.6):220)||o.h===40)&&shown<90;g.userData.lab.visible=near;if(near){shown++;setSpriteScale(g.userData.lab,pl.mode==='map'?clamp(d/26,1.2,24):clamp(d/20,0.8,3));}}}
+
+/* ---- 1. OpenHistoricalMap: real past buildings & roads by year ---- */
+async function loadHistory(){if(XL.history)return;XL.history=true;const dLat=O.R*1.2/KZ,dLon=O.R*1.2/KX();const bb=[O.lat-dLat,O.lon-dLon,O.lat+dLat,O.lon+dLon].map(v=>v.toFixed(5)).join(',');
+ const q=`[out:json][timeout:40][bbox:${bb}];(nwr["start_date"];nwr["end_date"];);out geom tags 600;`;let d;
+ try{d=await jget('https://overpass-api.openhistoricalmap.org/api/interpreter',{method:'POST',body:'data='+encodeURIComponent(q)});}catch(e){showHint('🕰️ OpenHistoricalMap is busy, try again in a minute.',5);XL.history=false;return;}
+ const g=new THREE.Group();let n=0;const sepia=new THREE.MeshLambertMaterial({color:'#c9a46a',transparent:true,opacity:0.72,emissive:'#3a2a10'});
+ for(const el of d.elements||[]){const t=el.tags||{};const y0=parseYear({start_date:t.start_date})||(t.start_date?0:-9999),m1=String(t.end_date||'').match(/-?\d{3,4}/),y1=m1?+m1[0]:null;if(!y0&&!y1)continue;
+  let pos=null;if(el.type==='node')pos=toL(el.lat,el.lon);else if(el.geometry){const pts=el.geometry.filter(Boolean).map(p=>toL(p.lat,p.lon));if(pts.length<2)continue;pos=centroid(pts.length>2?pts:[pts[0],pts[1],pts[0]]);
+   if(t.building&&pts.length>3){try{const sh=new THREE.Shape(pts.map(p=>new THREE.Vector2(p[0],-p[1])));const hgt=parseFloat(t.height)||(parseFloat(t['building:levels'])||3)*3.2;const geo=new THREE.ExtrudeGeometry(sh,{depth:hgt,bevelEnabled:false});geo.rotateX(-Math.PI/2);const m=new THREE.Mesh(geo,sepia);m.userData.hy=[y0,y1];g.add(m);}catch(e){}}
+   else if(t.highway||t.railway||t.waterway){const A=Acc();A.uv=A.yr=A.id=null;ribbon(A,pts,t.railway?3:6,0.5,new THREE.Color(t.railway?'#5b4630':t.waterway?'#6f8fb0':'#b08a55'));const m=meshFrom(A,flatMat);world.remove(m);m.userData.hy=[y0,y1];g.add(m);}}
+  if(!pos||Math.abs(pos[0])>O.R*1.6||Math.abs(pos[1])>O.R*1.6)continue;const name=t.name||t['name:en'];if(!name||n>120)continue;n++;
+  const lbl=(y0>0?y0:'?')+'–'+(y1||'now')+' · '+name;xpin('history',pos[0],pos[1],'🕰️',lbl,()=>card('🕰️ '+name,'','<div><b>Existed</b> '+(y0>0?y0:'unknown')+' – '+(y1||'still here')+'</div>'+(t.description?'<div>'+esc(t.description)+'</div>':'')+'<div><b>Type</b> '+esc(t.building?'building':t.highway?'road':t.railway?'railway':t.historic||t.amenity||t.landuse||'place')+'</div>','<a target="_blank" rel="noopener" href="https://www.openhistoricalmap.org/'+el.type+'/'+el.id+'">Open in OpenHistoricalMap</a>'),{y0:y0||-9999,y1});}
+ g.userData.hist=true;layerG.add(g);XM.hist=g;showHint(n||g.children.length?'🕰️ '+(g.children.length+n)+' things from the past found. Drag the history slider!':'🕰️ OpenHistoricalMap has little data here yet.',5);}
+function updHistMesh(){const g=XM.hist;if(!g)return;const yr=yearU.value;g.visible=LAY.history;g.children.forEach(m=>{const [a,b]=m.userData.hy;m.visible=yr>=2100?!!(b&&b<2026&&false):a<=yr&&(!b||yr<b);});}
+
+/* ---- 2. Old maps (Wikimedia Commons, Allmaps, David Rumsey) ---- */
+async function oldMaps(){card('🗺️ Old maps of '+cityName(),'<i>Searching archives…</i>','','');try{const c=cityName();const j=await jget('https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrlimit=24&gsrsearch='+encodeURIComponent('filetype:bitmap intitle:map "'+c+'" 18')+'&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=420');
+ const ps=Object.values(j.query&&j.query.pages||{}).map(p=>{const ii=p.imageinfo&&p.imageinfo[0]||{},md=ii.extmetadata||{};const dt=(md.DateTimeOriginal&&md.DateTimeOriginal.value||'').replace(/<[^>]+>/g,'');const y=+(dt.match(/1[5-9]\d\d/)||[0])[0];return {t:p.title.replace(/^File:|\.\w+$/g,''),u:ii.thumburl,p:ii.descriptionurl,y};}).filter(p=>p.u).sort((a,b)=>(a.y||3000)-(b.y||3000));
+ $('iImg').innerHTML=ps.length?'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px">'+ps.map(p=>'<a target="_blank" rel="noopener" href="'+p.p+'"><img style="width:100%;height:120px;object-fit:cover" src="'+p.u+'"><small>'+(p.y?'<b>'+p.y+'</b> ':'')+esc(p.t.slice(0,60))+'</small></a>').join('')+'</div>':'<i>No old maps found on Commons.</i>';
+ $('iWiki').innerHTML='<a target="_blank" rel="noopener" href="https://www.davidrumsey.com/luna/servlet/view/search?q='+encodeURIComponent(c)+'">David Rumsey map collection</a> · <a target="_blank" rel="noopener" href="https://www.openhistoricalmap.org/#map=15/'+O.lat+'/'+O.lon+'">OpenHistoricalMap</a> · <a target="_blank" rel="noopener" href="https://allmaps.org/">Allmaps</a>';}catch(e){$('iImg').innerHTML='<i>Could not reach Wikimedia right now.</i>';}}
+
+/* ---- 3. TfL live buses & Tube ---- */
+const isLondon=()=>O.cc==='gb'&&O.lat>51.25&&O.lat<51.72&&O.lon>-0.55&&O.lon<0.35;let tflT=0;
+async function loadTransit(){if(XL.transit)return;XL.transit=true;if(!isLondon()){showHint('🚌 Live bus & Tube times are London-only for now (TfL open data). Other cities need a Transitland key.',6);return;}
+ try{const j=await jget(`https://api.tfl.gov.uk/StopPoint/?lat=${O.lat}&lon=${O.lon}&stopTypes=NaptanPublicBusCoachTram,NaptanMetroStation&radius=${Math.min(1200,O.R)}&modes=bus,tube`);
+  (j.stopPoints||[]).slice(0,70).forEach(s=>{const p=toL(s.lat,s.lon),tube=(s.modes||[]).includes('tube');const g=xpin('transit',p[0],p[1],tube?'🚇':'🚏',s.commonName+(s.indicator&&!tube?' ('+s.indicator.replace('Stop ','')+')':''),()=>tflCard(s),{h:4,pole:tube?'#0019a8':'#c8201e'});g.userData.stop=s;});
+  showHint('🚌 '+(X2.transit||[]).length+' TfL stops loaded. Tap one for live arrivals!',5);tflT=0;}catch(e){XL.transit=false;showHint('🚌 TfL is not answering right now.',4);}}
+async function tflArr(id){return (await jget('https://api.tfl.gov.uk/StopPoint/'+id+'/Arrivals')).sort((a,b)=>a.timeToStation-b.timeToStation);}
+async function tflCard(s){card('🚏 '+s.commonName,'','<i>Loading live arrivals…</i>','');try{const a=await tflArr(s.naptanId);$('iBody').innerHTML=a.length?a.slice(0,10).map(x=>'<div><b>'+esc(x.lineName)+'</b> → '+esc(x.destinationName)+' · '+(x.timeToStation<60?'due':Math.round(x.timeToStation/60)+' min')+(x.platformName&&x.platformName!=='null'?' · '+esc(x.platformName):'')+'</div>').join(''):'<div>No arrivals in the next 30 min.</div>';$('iWiki').innerHTML='<small>Live from TfL open data</small>';}catch(e){$('iBody').innerHTML='Could not load arrivals.';}}
+async function updTransit(dt){if(!LAY.transit||!X2.transit||!X2.transit.length)return;tflT-=dt;if(tflT>0)return;tflT=45;const cam=camera.position;const near=X2.transit.slice().sort((a,b)=>Math.hypot(a.position.x-cam.x,a.position.z-cam.z)-Math.hypot(b.position.x-cam.x,b.position.z-cam.z)).slice(0,6);
+ for(const g of near){try{const a=await tflArr(g.userData.stop.naptanId);if(!a.length)continue;const s=g.userData.stop,nl=labelSprite(s.commonName+' · '+a[0].lineName+' '+(a[0].timeToStation<60?'due':Math.round(a[0].timeToStation/60)+'m'),(s.modes||[]).includes('tube')?'🚇':'🚌');nl.position.copy(g.userData.lab.position);g.remove(g.userData.lab);g.add(nl);g.userData.lab=nl;}catch(e){}}}
+
+/* ---- 4. GDELT world news about this place ---- */
+async function loadNews(){if(XL.news)return;XL.news=true;try{const j=await jget('https://api.gdeltproject.org/api/v2/doc/doc?query='+encodeURIComponent('"'+cityName()+'" sourcelang:english')+'&mode=artlist&maxrecords=20&format=json&timespan=48h&sort=datedesc');
+ (j.articles||[]).forEach((a,i)=>{const hit=nearPoiName(a.title);let x,z;if(hit){x=hit.p[0];z=hit.p[1];}else{const an=i*2.4,r=O.R*(0.3+0.5*((i*37)%10)/10);x=Math.cos(an)*r;z=Math.sin(an)*r;}
+  const d=String(a.seendate||'');const when=d?d.slice(6,8)+'/'+d.slice(4,6)+' '+d.slice(9,11)+':'+d.slice(11,13):'';
+  xpin('news',x,z,'📰',a.title.slice(0,70),()=>card('📰 '+a.title,a.socialimage?'<img src="'+esc(a.socialimage)+'" alt="">':'','<div><b>Source</b> '+esc(a.domain)+'</div><div><b>Seen</b> '+when+' UTC</div><div>'+(hit?'📍 Mentions <b>'+esc(hit.t.name)+'</b>, so it is pinned there.':'📍 About '+esc(cityName())+' (not tied to one spot).')+'</div>','<a target="_blank" rel="noopener" href="'+esc(a.url)+'">Read the article</a>'),{h:hit?undefined:14,pole:'#444'});});
+ showHint('📰 '+(X2.news||[]).length+' news stories from the last 2 days (GDELT).',5);}catch(e){XL.news=false;showHint('📰 GDELT news is busy, try again soon.',4);}}
+
+/* ---- 5. USGS earthquakes + NASA EONET natural events ---- */
+let shakeT=0;
+async function loadHazards(){if(XL.hazards)return;XL.hazards=true;let n=0;try{const j=await jget('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_week.geojson');
+ j.features.forEach(f=>{const [lo,la]=f.geometry.coordinates,p=toL(la,lo),d=Math.hypot(p[0],p[1])/1000;if(d>2500)return;n++;const pr=f.properties,ago=(Date.now()-pr.time)/36e5;if(ago<1&&d<400)shakeT=3;
+  horizon('hazards',la,lo,'🌋','M'+pr.mag.toFixed(1)+' quake',()=>card('🌋 Magnitude '+pr.mag.toFixed(1)+' earthquake','','<div><b>Where</b> '+esc(pr.place)+'</div><div><b>When</b> '+new Date(pr.time).toLocaleString()+'</div><div><b>Distance</b> '+Math.round(d)+' km away</div>'+(pr.tsunami?'<div>🌊 Tsunami flag</div>':''),'<a target="_blank" rel="noopener" href="'+pr.url+'">USGS details</a>'));});}catch(e){}
+ try{const b=[O.lon-20,O.lat+15,O.lon+20,O.lat-15].map(v=>v.toFixed(2)).join(',');const j=await jget('https://eonet.gsfc.nasa.gov/api/v3/events?status=open&days=30&bbox='+b);const IC={wildfires:'🔥',severeStorms:'🌀',volcanoes:'🌋',seaLakeIce:'🧊',floods:'🌊',dustHaze:'🌫️',landslides:'⛰️',snow:'❄️'};
+ j.events.forEach(ev=>{const gm=ev.geometry[ev.geometry.length-1];if(!gm||gm.type!=='Point')return;n++;const cat=ev.categories[0]||{};horizon('hazards',gm.coordinates[1],gm.coordinates[0],IC[cat.id]||'⚠️',ev.title.slice(0,40),()=>card((IC[cat.id]||'⚠️')+' '+ev.title,'','<div><b>Type</b> '+esc(cat.title)+'</div><div><b>Last update</b> '+new Date(gm.date).toLocaleDateString()+'</div>',(ev.sources[0]?'<a target="_blank" rel="noopener" href="'+ev.sources[0].url+'">Source</a> · ':'')+'<small>NASA EONET</small>'));});}catch(e){}
+ showHint(n?'🌍 '+n+' live earthquakes & natural events around (USGS + NASA). Far ones sit on the horizon.':'🌍 No quakes or natural events nearby right now.',5);}
+function updShake(dt){if(shakeT>0){shakeT-=dt;camera.position.x+=(Math.random()-.5)*0.5*shakeT;camera.position.y+=(Math.random()-.5)*0.3*shakeT;}}
+
+/* ---- 6. RainViewer live radar (mini map) ---- */
+let radarFrames=[],radarI=0,radarT=0;
+async function loadRadar(){let box=$('radar');if(!box){box=document.createElement('div');box.id='radar';box.style.cssText='position:fixed;right:10px;bottom:120px;width:192px;height:192px;overflow:hidden;border-radius:12px;border:3px solid #6b4f2e;z-index:6;background:#cde';document.body.appendChild(box);box.onclick=()=>{LAY.radar=false;applyLayer('radar');};}
+ box.style.display='block';box.innerHTML='<i style="font:12px sans-serif;padding:6px;display:block">Loading radar…</i>';try{const j=await jget('https://api.rainviewer.com/public/weather-maps.json');const z=7,n=2**z,fx=(O.lon+180)/360*n,la=O.lat*Math.PI/180,fy=(1-Math.log(Math.tan(la)+1/Math.cos(la))/Math.PI)/2*n,tx=Math.floor(fx),ty=Math.floor(fy),ox=96-(fx-tx)*256,oy=96-(fy-ty)*256;
+ let h='';const tiles=(url)=>{let s='';for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++)s+='<img src="'+url(tx+dx,ty+dy)+'" style="position:absolute;left:'+(ox+dx*256)+'px;top:'+(oy+dy*256)+'px;width:256px;height:256px">';return s;};
+ h+=tiles((x,y)=>'https://tile.openstreetmap.org/'+z+'/'+x+'/'+y+'.png');radarFrames=(j.radar.past||[]).concat(j.radar.nowcast||[]);radarFrames.forEach((f,i)=>{h+='<div class="rf" style="position:absolute;inset:0;opacity:'+(i===radarFrames.length-1?0.75:0)+'">'+tiles((x,y)=>j.host+f.path+'/256/'+z+'/'+x+'/'+y+'/2/1_1.png')+'</div>';});
+ h+='<div style="position:absolute;left:90px;top:90px;width:12px;height:12px;border-radius:50%;background:#e33;border:2px solid #fff"></div><div id="radarT" style="position:absolute;left:0;right:0;bottom:0;background:#0008;color:#fff;font:11px sans-serif;padding:2px 6px">RainViewer</div>';box.innerHTML=h;radarI=0;}catch(e){box.innerHTML='<i style="font:12px sans-serif;padding:6px;display:block">Radar unavailable.</i>';}}
+function updRadar(dt){const box=$('radar');if(!box||!LAY.radar||!radarFrames.length)return;radarT-=dt;if(radarT>0)return;radarT=0.6;const fs=box.querySelectorAll('.rf');fs.forEach(f=>f.style.opacity=0);radarI=(radarI+1)%fs.length;if(fs[radarI])fs[radarI].style.opacity=0.75;const t=new Date(radarFrames[radarI].time*1000);$('radarT').textContent='🌧️ Radar '+t.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+(radarFrames[radarI].time*1000>Date.now()?' (forecast)':'');}
+
+/* ---- 7. Nature: iNaturalist + GBIF sightings, Buddy goes hunting ---- */
+const NAT_E={Aves:'🐦',Mammalia:'🦊',Insecta:'🐞',Plantae:'🌿',Fungi:'🍄',Reptilia:'🦎',Amphibia:'🐸',Actinopterygii:'🐟',Mollusca:'🐌',Arachnida:'🕷️'};
+let natCol=new Set();try{natCol=new Set(JSON.parse(localStorage.getItem('bw.nature')||'[]'));}catch(e){}
+async function loadNature(){if(XL.nature)return;XL.nature=true;const km=Math.max(0.5,O.R*1.3/1000).toFixed(2);let list=[];
+ try{const j=await jget(`https://api.inaturalist.org/v1/observations?lat=${O.lat}&lng=${O.lon}&radius=${km}&photos=true&per_page=80&order=desc&order_by=observed_on&quality_grade=research`);
+  list=j.results.filter(r=>r.geojson&&r.taxon).map(r=>({lat:r.geojson.coordinates[1],lon:r.geojson.coordinates[0],name:r.taxon.preferred_common_name||r.taxon.name,sci:r.taxon.name,ic:r.taxon.iconic_taxon_name,img:r.photos[0]&&r.photos[0].url.replace('square','medium'),date:r.observed_on,who:r.user&&r.user.login,url:r.uri,src:'iNaturalist'}));}catch(e){}
+ if(list.length<10){try{const d=O.R*1.3/KZ,e=O.R*1.3/KX();const j=await jget(`https://api.gbif.org/v1/occurrence/search?decimalLatitude=${(O.lat-d).toFixed(4)},${(O.lat+d).toFixed(4)}&decimalLongitude=${(O.lon-e).toFixed(4)},${(O.lon+e).toFixed(4)}&mediaType=StillImage&limit=60`);
+  j.results.forEach(r=>{if(r.decimalLatitude)list.push({lat:r.decimalLatitude,lon:r.decimalLongitude,name:r.vernacularName||r.species||r.scientificName,sci:r.scientificName,ic:r.class==='Aves'?'Aves':r.class==='Mammalia'?'Mammalia':r.class==='Insecta'?'Insecta':r.kingdom==='Plantae'?'Plantae':r.kingdom==='Fungi'?'Fungi':'',img:r.media&&r.media[0]&&r.media[0].identifier,date:(r.eventDate||'').slice(0,10),who:r.recordedBy,url:'https://www.gbif.org/occurrence/'+r.key,src:'GBIF'});});}catch(e){}}
+ list.forEach(s=>{const p=toL(s.lat,s.lon);const g=xpin('nature',p[0],p[1],NAT_E[s.ic]||'🐾',s.name,()=>natCard(s,g),{h:2.5,pole:'#5a8a3a'});g.userData.nat=s;});
+ if(list.length)say('Ooh, '+list.length+' real animals & plants were spotted here! Tap one and I\'ll go find it 🔍',5);}
+function natCard(s,g){card((NAT_E[s.ic]||'🐾')+' '+s.name,s.img?'<img src="'+esc(s.img)+'" alt="">':'','<div><b>Species</b> <i>'+esc(s.sci)+'</i></div><div><b>Spotted</b> '+esc(s.date||'?')+'</div>'+(s.who?'<div><b>By</b> '+esc(String(s.who).slice(0,40))+'</div>':'')+'<div><b>Found by Buddy</b> '+natCol.size+' species so far</div><button id="goFind">🔍 Buddy, go find it!</button>','<a target="_blank" rel="noopener" href="'+esc(s.url)+'">'+s.src+' record</a>');$('goFind').onclick=()=>{petTarget=[g.position.x,g.position.z];hunt=g;$('info').style.display='none';say('On it! Looking for the '+s.name+'…',3);};}
+let hunt=null;function updHunt(){if(!hunt)return;if(Math.hypot(pet.x-hunt.position.x,pet.z-hunt.position.z)<4){const s=hunt.userData.nat;const isNew=!natCol.has(s.sci);natCol.add(s.sci);try{localStorage.setItem('bw.nature',JSON.stringify([...natCol]));}catch(e){}pet.happy=3;pet.waveT=1.2;say((isNew?'NEW! ':'')+'Found the '+s.name+'! '+(NAT_E[s.ic]||'🐾')+' ('+natCol.size+' species collected)',5);if(voiceOn)speak('I found the '+s.name+'!');hunt=null;}}
+
+/* ---- 8. OpenAlex research institutions & their newest papers ---- */
+async function loadResearch(){if(XL.research)return;XL.research=true;try{const j=await jget('https://api.openalex.org/institutions?filter=country_code:'+(O.cc||'gb').toUpperCase()+',geo.city:'+encodeURIComponent(cityName())+'&per-page=60&mailto=buddyworld@example.org');let n=0;
+ (j.results||[]).forEach(r=>{if(!r.geo||r.geo.latitude==null)return;const p=toL(r.geo.latitude,r.geo.longitude),d=Math.hypot(p[0],p[1]);if(d>15000)return;n++;horizon('research',r.geo.latitude,r.geo.longitude,'🎓',r.display_name.slice(0,48),()=>resCard(r));});
+ showHint(n?'🎓 '+n+' research places here (OpenAlex). Tap for their newest papers.':'🎓 No research institutions listed for '+cityName()+'.',5);}catch(e){XL.research=false;}}
+async function resCard(r){card('🎓 '+r.display_name,'','<div><b>Type</b> '+esc(r.type)+'</div><div><b>Papers</b> '+(r.works_count||0).toLocaleString()+'</div><div><i>Loading newest research…</i></div>','<a target="_blank" rel="noopener" href="'+esc(r.homepage_url||r.id)+'">Website</a>');
+ try{const id=r.id.split('/').pop();const w=await jget('https://api.openalex.org/works?filter=institutions.id:'+id+'&sort=publication_date:desc&per-page=6&mailto=buddyworld@example.org');$('iBody').innerHTML+='<div><b>Newest papers</b></div>'+w.results.map(x=>'<div>📄 <a target="_blank" rel="noopener" href="'+esc(x.doi||x.id)+'">'+esc((x.title||'').slice(0,110))+'</a> <small>'+esc(x.publication_date)+'</small></div>').join('');$('iBody').querySelector('i').remove();}catch(e){}}
+
+/* ---- 9. Radio Browser: live local radio ---- */
+const radioA=new Audio();radioA.crossOrigin='anonymous';
+async function openRadio(){card('📻 Radio near '+cityName(),'','<i>Tuning in…</i>','<small>Radio Browser (community open database)</small>');let st=[];const host='https://de1.api.radio-browser.info/json/stations/search?hidebroken=true&order=clickcount&reverse=true&limit=60';
+ try{st=await jget(host+`&geo_lat=${O.lat}&geo_long=${O.lon}&geo_distance=60000`);}catch(e){}if(st.length<5){try{st=st.concat(await jget(host+'&countrycode='+(O.cc||'gb').toUpperCase()));}catch(e){}}
+ st=st.filter(s=>/^https:/.test(s.url_resolved));const seen=new Set();st=st.filter(s=>!seen.has(s.name)&&seen.add(s.name)).slice(0,30);
+ $('iBody').innerHTML=(radioA.src&&!radioA.paused?'<button id="rStop">⏹ Stop radio</button>':'')+(st.length?st.map((s,i)=>'<div><button data-r="'+i+'" style="width:100%;text-align:left">▶ '+esc(s.name.slice(0,50))+' <small>'+esc((s.tags||'').split(',').slice(0,2).join(', '))+'</small></button></div>').join(''):'<div>No stations found.</div>');
+ $('iBody').querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{const s=st[+b.dataset.r];radioA.src=s.url_resolved;radioA.play().then(()=>{say('📻 Now playing '+s.name+'!',4);musicStop();}).catch(()=>showHint('That station would not play, try another.',3));});if($('rStop'))$('rStop').onclick=()=>{radioA.pause();radioA.src='';$('rStop').remove();};}
+
+/* ---- 10. Tone.js: music that follows time & weather ---- */
+let musicOn=false,mus=null;
+async function musicStart(){if(!window.Tone)await loadScript('https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js');await Tone.start();radioA.pause();if(!mus){const rev=new Tone.Reverb(4).toDestination(),filt=new Tone.Filter(1800,'lowpass').connect(rev);const syn=new Tone.PolySynth(Tone.Synth,{oscillator:{type:'triangle'},envelope:{attack:0.05,release:2}}).connect(filt);syn.volume.value=-16;const pad=new Tone.PolySynth(Tone.AMSynth).connect(filt);pad.volume.value=-24;
+ const DAY=['C4','D4','E4','G4','A4','C5','D5'],NIGHT=['A3','C4','D4','E4','G4','A4','C5'];let step=0;
+ const loop=new Tone.Loop(t=>{const h=cityHour(),night=h<6||h>20,wet=WX&&(WX.weather_code>=51);const sc=night?NIGHT:DAY;filt.frequency.rampTo(wet?700:night?1100:2400,2);Tone.Transport.bpm.value=night?62:wet?70:88;
+  if(Math.random()<(night?0.45:0.7))syn.triggerAttackRelease(sc[(step*3+Math.floor(Math.random()*3))%sc.length],'8n',t);if(step%8===0)pad.triggerAttackRelease([sc[0].replace(/\d/,'3'),sc[2].replace(/\d/,'3')],'1m',t);step++;},'8n');mus={loop};}
+ mus.loop.start(0);Tone.Transport.start();musicOn=true;}
+function musicStop(){if(window.Tone&&mus){mus.loop.stop();Tone.Transport.stop();}musicOn=false;}
+
+/* ---- 11. Overture Maps: fill in buildings OSM is missing (PMTiles) ---- */
+async function loadOverture(){if(XL.overture)return;XL.overture=true;showHint('🏗️ Asking Overture Maps for extra buildings…',4);try{
+ if(!window.pmtiles)await loadScript('https://cdn.jsdelivr.net/npm/pmtiles@3.2.1/dist/pmtiles.js');const {VectorTile}=await import('https://esm.sh/@mapbox/vector-tile@2.0.3');const Pbf=(await import('https://esm.sh/pbf@4.0.1')).default;
+ let rel=null;try{const c=await jget('https://stac.overturemaps.org/catalog.json');const ch=(c.links||[]).filter(l=>l.rel==='child').map(l=>(l.href.match(/\d{4}-\d\d-\d\d\.\d+/)||[])[0]).filter(Boolean).sort();rel=ch.pop();}catch(e){}
+ const tries=(rel?[rel]:[]).concat(['2025-10-22.0','2025-09-24.0','2025-08-20.1','2025-07-23.0']);let P=null;for(const r of tries){try{const p=new pmtiles.PMTiles('https://overturemaps-tiles-us-west-2-beta.s3.amazonaws.com/'+r+'/buildings.pmtiles');await p.getHeader();P=p;break;}catch(e){}}if(!P)throw 0;
+ const z=14,n=2**z,tile=(lat,lon)=>{const la=lat*Math.PI/180;return [Math.floor((lon+180)/360*n),Math.floor((1-Math.log(Math.tan(la)+1/Math.cos(la))/Math.PI)/2*n)];};const dLat=O.R/KZ,dLon=O.R/KX();const a=tile(O.lat+dLat,O.lon-dLon),b=tile(O.lat-dLat,O.lon+dLon);
+ const mat=new THREE.MeshLambertMaterial({color:'#e7d3b0'});const geos=[];let added=0;
+ for(let x=a[0];x<=b[0];x++)for(let y=a[1];y<=b[1];y++){const r=await P.getZxy(z,x,y);if(!r||!r.data)continue;const vt=new VectorTile(new Pbf(new Uint8Array(r.data)));const L=vt.layers.building;if(!L)continue;
+  for(let i=0;i<L.length;i++){const f=L.feature(i);if(f.type!==3)continue;const gj=f.toGeoJSON(x,y,z);const polys=gj.geometry.type==='Polygon'?[gj.geometry.coordinates]:gj.geometry.coordinates;
+   for(const pc of polys){const ring=pc[0].map(c=>toL(c[1],c[0]));const c=centroid(ring);if(Math.abs(c[0])>O.R||Math.abs(c[1])>O.R||CITY.buildingAt(c[0],c[1]))continue;const pr=f.properties;const h=pr.height||(pr.num_floors?pr.num_floors*3.2:6);
+    try{const sh=new THREE.Shape(ring.map(p=>new THREE.Vector2(p[0],-p[1])));const g=new THREE.ExtrudeGeometry(sh,{depth:h,bevelEnabled:false});g.rotateX(-Math.PI/2);geos.push(new THREE.Mesh(g,mat));added++;}catch(e){}}}}
+ const grp=new THREE.Group();geos.forEach(m=>grp.add(m));layerG.add(grp);XM.over=grp;showHint(added?'🏗️ Overture added '+added+' buildings OSM was missing (cream coloured).':'🏗️ OSM already has every building here!',5);}catch(e){XL.overture=false;showHint('🏗️ Overture tiles not reachable right now.',4);}}
+
+/* ---- 12. Panoramax street photos + archive photos + museum art ---- */
+async function streetPhoto(x,z){const ll=toLL(x,z),e=0.0006;try{const j=await jget(`https://api.panoramax.xyz/api/search?bbox=${ll[1]-e},${ll[0]-e},${ll[1]+e},${ll[0]+e}&limit=1`);const f=j.features&&j.features[0];if(!f){showHint('📸 No open street photo right here. Try a busier street.',3);return;}
+ const a=f.assets||{},u=(a.sd||a.thumb||a.hd||{}).href;card('📸 Street photo here',u?'<img src="'+esc(u)+'" alt="">':'','<div><b>Taken</b> '+esc((f.properties.datetime||'').slice(0,10))+'</div>','<a target="_blank" rel="noopener" href="https://api.panoramax.xyz/#focus=pic&pic='+f.id+'">Open in Panoramax</a>');}catch(e){}}
+async function archivePhotos(name){if(!name)return;const box=document.createElement('div');box.innerHTML='<b>🗄️ Old photos & archives</b><div class="ap" style="display:flex;gap:6px;overflow:auto;padding:4px 0"><i>searching…</i></div>';$('iBody').appendChild(box);const row=box.querySelector('.ap');const items=[];
+ await Promise.all([jget('https://www.loc.gov/photos/?q='+encodeURIComponent(name+' '+cityName())+'&fo=json&c=6').then(j=>(j.results||[]).forEach(r=>{const im=(r.image_url||[])[0];if(im)items.push({u:im,t:r.title,d:r.date,l:r.url,s:'Library of Congress'});})).catch(()=>{}),
+  jget('https://archive.org/advancedsearch.php?q='+encodeURIComponent('"'+name+'" AND mediatype:image')+'&fl[]=identifier&fl[]=title&fl[]=date&rows=6&output=json').then(j=>(j.response.docs||[]).forEach(d=>items.push({u:'https://archive.org/services/img/'+d.identifier,t:d.title,d:(d.date||'').slice(0,4),l:'https://archive.org/details/'+d.identifier,s:'Internet Archive'}))).catch(()=>{})]);
+ row.innerHTML=items.length?items.map(i=>'<a target="_blank" rel="noopener" href="'+esc(i.l)+'" title="'+esc(i.t)+' ('+i.s+')" style="flex:0 0 110px"><img src="'+esc(i.u)+'" style="width:110px;height:90px;object-fit:cover"><small>'+esc((i.d||'')+' '+String(i.t||'').slice(0,30))+'</small></a>').join(''):'<small>Nothing in the archives for this one.</small>';}
+async function getArt(q){const out=[];
+ try{const j=await jget('https://api.artic.edu/api/v1/artworks/search?q='+encodeURIComponent(q)+'&limit=14&fields=id,title,artist_display,date_display,image_id');j.data.forEach(a=>{if(a.image_id)out.push({img:'https://www.artic.edu/iiif/2/'+a.image_id+'/full/400,/0/default.jpg',t:a.title,by:a.artist_display,d:a.date_display,l:'https://www.artic.edu/artworks/'+a.id,s:'Art Institute of Chicago'});});}catch(e){}
+ try{const j=await jget('https://api.europeana.eu/record/v2/search.json?wskey=api2demo&rows=10&qf=TYPE:IMAGE&reusability=open&query='+encodeURIComponent(q));(j.items||[]).forEach(a=>{if(a.edmPreview)out.push({img:a.edmPreview[0],t:(a.title||[''])[0],by:(a.dcCreator||[''])[0],d:(a.year||[''])[0],l:a.guid,s:'Europeana'});});}catch(e){}
+ try{const j=await jget('https://collectionapi.metmuseum.org/public/collection/v1/search?hasImages=true&q='+encodeURIComponent(q));for(const id of (j.objectIDs||[]).slice(0,6)){try{const o=await jget('https://collectionapi.metmuseum.org/public/collection/v1/objects/'+id);if(o.primaryImageSmall)out.push({img:o.primaryImageSmall,t:o.title,by:o.artistDisplayName,d:o.objectDate,l:o.objectURL,s:'The Met'});}catch(e){}}}catch(e){}
+ try{const j=await jget('https://api.si.edu/openaccess/api/v1.0/search?api_key=DEMO_KEY&rows=8&q='+encodeURIComponent(q+' AND online_media_type:"Images"'));(j.response.rows||[]).forEach(r=>{const m=r.content&&r.content.descriptiveNonRepeating&&r.content.descriptiveNonRepeating.online_media;const im=m&&m.media&&m.media[0];if(im&&im.thumbnail)out.push({img:im.thumbnail,t:r.title,by:'',d:'',l:r.content.descriptiveNonRepeating.record_link,s:'Smithsonian'});});}catch(e){}
+ return out;}
+const texL=new THREE.TextureLoader();texL.setCrossOrigin('anonymous');
+async function hangArt(b){if(!inside||inside.b!==b)return;const name=b.t.name||'';const q=name.replace(/museum|gallery|the|of|national/gi,' ').trim()||cityName();let art=await getArt(q);if(art.length<6)art=art.concat(await getArt(cityName()));if(!inside||inside.b!==b||!art.length)return;
+ const fg=inside.floors[0],outer=b.poly.outer,c=centroid(outer);let k=0;for(let i=0;i<outer.length-1&&k<art.length;i++){const a=outer[i],bb=outer[i+1],len=Math.hypot(bb[0]-a[0],bb[1]-a[1]);const per=Math.floor(len/3.2);
+  for(let j=0;j<per&&k<art.length;j++){const t=(j+0.5)/per,x=a[0]+(bb[0]-a[0])*t,z=a[1]+(bb[1]-a[1])*t;let nx=-(bb[1]-a[1])/len,nz=(bb[0]-a[0])/len;if((c[0]-x)*nx+(c[1]-z)*nz<0){nx=-nx;nz=-nz;}const A=art[k++];
+   const fr=new THREE.Mesh(GB,M('#7a5a2a'));fr.scale.set(1.9,1.5,0.08);const pic=new THREE.Mesh(new THREE.PlaneGeometry(1.7,1.3),new THREE.MeshBasicMaterial({color:'#ddd'}));pic.position.z=0.05;fr.add(pic);
+   const holder=new THREE.Group();holder.add(fr);fr.position.set(0,0,0);holder.position.set(x+nx*0.35,1.9,z+nz*0.35);holder.lookAt(x+nx*5,1.9,z+nz*5);holder.userData.card=()=>card('🖼️ '+A.t,'<img src="'+esc(A.img)+'" alt="">','<div><b>Artist</b> '+esc(A.by||'unknown')+'</div><div><b>Date</b> '+esc(A.d||'?')+'</div><div><b>Collection</b> '+A.s+'</div>','<a target="_blank" rel="noopener" href="'+esc(A.l)+'">See it at '+A.s+'</a>');
+   texL.load(A.img,tx=>{pic.material.map=tx;pic.material.color.set('#fff');pic.material.needsUpdate=true;const r=tx.image.width/tx.image.height;if(r>0)pic.scale.set(Math.min(1,r*1.3/1.7),Math.min(1,1.7/r/1.3),1);},undefined,()=>{});fg.add(holder);}}
+ if(k)say('I hung '+k+' real artworks from open museum collections in here 🖼️',5);}
+
+/* ---- 13. Buddy chat: local brain, optional in-browser AI (WebLLM / Transformers.js), voice ---- */
+let voiceOn=false,kokoro=null,llm=null,llmKind='',chatLog=[];
+function speak(t){if(!voiceOn)return;t=t.replace(/[\u{1F000}-\u{1FFFF}☀-➿]/gu,'');if(kokoro){kokoro.generate(t,{voice:'af_heart'}).then(a=>{const u=URL.createObjectURL(a.toBlob());new Audio(u).play();}).catch(()=>{});return;}
+ if(!window.speechSynthesis)return;const u=new SpeechSynthesisUtterance(t);u.pitch=1.7;u.rate=1.05;speechSynthesis.cancel();speechSynthesis.speak(u);}
+function context(){const near=CITY?CITY.pois.filter(p=>p.t.name).map(p=>[Math.hypot(p.p[0]-pet.x,p.p[1]-pet.z),p]).sort((a,b)=>a[0]-b[0]).slice(0,6).map(x=>x[1].t.name+' ('+poiKind(x[1].t)+', '+Math.round(x[0])+' m)'):[];
+ const w=WX?WCODE(WX.weather_code)[1]+', '+Math.round(WX.temperature_2m)+'°C':'unknown';return {place:cityName(),near,w,hour:Math.floor(cityHour()),nat:(X2.nature||[]).length,found:natCol.size};}
+function localBrain(q){const c=context(),ql=q.toLowerCase();if(/weather|rain|cold|hot|temp/.test(ql))return 'Right now in '+c.place+' it\'s '+c.w+'. '+(WX&&WX.weather_code>=51?'Umbrella time! ☔':'Nice for a walk! 🐾');
+ if(/where|near|around|what.*(here|see)/.test(ql))return c.near.length?'Closest to me: '+c.near.slice(0,3).join(', ')+'. Wanna go?':'Hmm, nothing named nearby. Let\'s explore!';
+ if(/animal|bird|nature|plant|fox/.test(ql))return c.nat?'There are '+c.nat+' real sightings around. I\'ve collected '+c.found+' species so far! Tap a 🐦 or 🦊 pin and I\'ll go find it.':'Turn on 🦊 Nature in Layers and I\'ll hunt for animals!';
+ if(/time|late|night|morning/.test(ql))return 'It\'s about '+c.hour+':00 here. '+(c.hour<6||c.hour>20?'Night owl mode 🌙':'Daytime adventures! ☀️');
+ if(/hi|hello|hey|salam/.test(ql))return pickR(['Hiii! 👋 Where should we go?','Hey friend! I love '+c.place+'!','Hello! Want to go on a nature hunt?']);
+ if(/joke/.test(ql))return pickR(['Why did the cat sit on the computer? To keep an eye on the mouse! 🐭','What do pandas eat at parties? Bam-BOO-zle cake! 🎋']);
+ if(/ball|play|game/.test(ql)){spawnBall();return 'Ball time! ⚽ Walk into it to kick it, I\'ll chase it!';}
+ if(/jump/.test(ql)){petJump=0.01;return 'Boing! 🦘';}
+ return pickR(['Ooh tell me more!','I\'m still small-brained 🧠 Turn on Smart Buddy for real chat!','Let\'s go explore '+c.place+' together!']);}
+async function loadBrain(st){try{if(navigator.gpu){st('Downloading WebLLM model (~350 MB, once)…');const wl=await import('https://esm.run/@mlc-ai/web-llm');llm=await wl.CreateMLCEngine('Qwen2.5-0.5B-Instruct-q4f16_1-MLC',{initProgressCallback:p=>st(Math.round((p.progress||0)*100)+'% '+(p.text||'').slice(0,40))});llmKind='webllm';}
+ else{st('No WebGPU, using Transformers.js (slower)…');const tf=await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3');llm=await tf.pipeline('text-generation','onnx-community/Qwen2.5-0.5B-Instruct',{dtype:'q4',progress_callback:p=>p.progress&&st(Math.round(p.progress)+'% '+(p.file||''))});llmKind='tf';}st('🧠 Smart Buddy ready!');}catch(e){st('Could not load the AI here: '+e.message);llm=null;}}
+async function smartReply(q){const c=context();const sys='You are Buddy, a tiny cute '+kind+' exploring '+c.place+' in a 3D map with your best friend. Reply in 1-2 short, playful sentences with an emoji. Facts: weather '+c.w+'; local time '+c.hour+':00; nearby: '+c.near.join('; ')+'; species found '+c.found+'.';
+ const msgs=[{role:'system',content:sys}].concat(chatLog.slice(-6),[{role:'user',content:q}]);if(llmKind==='webllm'){const r=await llm.chat.completions.create({messages:msgs,max_tokens:80,temperature:0.8});return r.choices[0].message.content;}
+ const r=await llm(msgs,{max_new_tokens:70,do_sample:true,temperature:0.8});const g=r[0].generated_text;return Array.isArray(g)?g[g.length-1].content:String(g);}
+function openChat(){let p=$('chatP');if(!p){p=document.createElement('div');p.id='chatP';p.className='paper';p.style.cssText='position:fixed;left:10px;bottom:10px;width:min(360px,92vw);max-height:60vh;display:flex;flex-direction:column;z-index:12;padding:8px;border-radius:14px';
+ p.innerHTML='<div style="display:flex;gap:4px;flex-wrap:wrap"><b style="flex:1">💬 Talk to Buddy</b><button id="cVoice">🔈 Voice off</button><button id="cX">✕</button></div><div id="cLog" style="flex:1;overflow:auto;font-size:14px;margin:6px 0;min-height:80px"></div><div style="display:flex;gap:4px"><input id="cIn" placeholder="Say something…" style="flex:1;min-width:0"><button id="cMic">🎤</button><button id="cGo">➤</button></div><div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap"><button id="cBrain">🧠 Smart Buddy (AI in browser)</button><button id="cKok">🗣️ Nicer voice</button></div><small id="cSt"></small>';document.body.appendChild(p);
+ const st=t=>$('cSt').textContent=t;const add=(who,t)=>{const d=document.createElement('div');d.innerHTML='<b>'+who+':</b> '+esc(t);$('cLog').appendChild(d);$('cLog').scrollTop=1e6;};
+ const send=async()=>{const q=$('cIn').value.trim();if(!q)return;$('cIn').value='';add('You',q);let a;if(llm){st('Buddy is thinking…');try{a=await smartReply(q);}catch(e){a=localBrain(q);}st('');}else a=localBrain(q);chatLog.push({role:'user',content:q},{role:'assistant',content:a});add(kind==='cat'?'🐱 Buddy':'🐼 Buddy',a);say(a,5);speak(a);if(room)room.chat(a);};
+ $('cGo').onclick=send;$('cIn').onkeydown=e=>{e.stopPropagation();if(e.key==='Enter')send();};$('cIn').onkeyup=e=>e.stopPropagation();$('cX').onclick=()=>p.style.display='none';
+ $('cVoice').onclick=()=>{voiceOn=!voiceOn;$('cVoice').textContent=voiceOn?'🔊 Voice on':'🔈 Voice off';if(voiceOn)speak('Hi! I can talk now!');};
+ $('cMic').onclick=()=>{const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){st('Your browser has no speech recognition (try Chrome).');return;}const r=new SR();r.lang='en-GB';r.onresult=e=>{$('cIn').value=e.results[0][0].transcript;send();};r.onerror=()=>st('Mic error');st('Listening…');r.start();};
+ $('cBrain').onclick=()=>{if(!llm)loadBrain(st);};$('cKok').onclick=async()=>{st('Loading Kokoro voice (~90 MB, once)…');try{const {KokoroTTS}=await import('https://cdn.jsdelivr.net/npm/kokoro-js@1/+esm');kokoro=await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX',{dtype:'q8',device:'wasm'});voiceOn=true;$('cVoice').textContent='🔊 Voice on';st('🗣️ Kokoro voice ready');speak('Do I sound better now?');}catch(e){st('Kokoro failed: '+e.message);}};
+ add(kind==='cat'?'🐱 Buddy':'🐼 Buddy','Hi! Ask me about the weather, what\'s near, animals, or say "play ball"!');}p.style.display='flex';}
+
+/* ---- 14. Physics: jump + football ---- */
+let pJumpV=0,pJumpH=0,petJump=0,ball=null;
+function spawnBall(){if(!CITY)return;if(!ball){const m=new THREE.Mesh(new THREE.SphereGeometry(0.35,16,12),new THREE.MeshLambertMaterial({color:'#fff',emissive:'#222'}));const pt=new THREE.Mesh(new THREE.SphereGeometry(0.355,6,4),new THREE.MeshBasicMaterial({color:'#111',wireframe:true}));m.add(pt);world.add(m);ball={m,v:new THREE.Vector3()};}
+ ball.m.position.set(pet.x+2,1.5,pet.z+2);ball.v.set(0,0,0);}
+const _updPlayer=updatePlayer;updatePlayer=function(dt){_updPlayer(dt);if(pl.mode==='walk'){if(keys.Space&&pJumpH<=0.001)pJumpV=5.2;pJumpV-=14*dt;pJumpH=Math.max(0,pJumpH+pJumpV*dt);if(pJumpH===0)pJumpV=0;pl.y=pJumpH;}};
+function updPhysics(dt){
+ if(petJump>0){petJump+=dt;const h=Math.max(0,Math.sin(petJump*Math.PI/0.6))*1.1;pet.root.position.y+=h;if(petJump>0.6)petJump=0;}
+ if(!ball)return;const p=ball.m.position,v=ball.v;v.y-=9.8*dt;p.addScaledVector(v,dt);if(p.y<0.35){p.y=0.35;v.y=Math.abs(v.y)>1?-v.y*0.55:0;v.x*=1-1.6*dt;v.z*=1-1.6*dt;}
+ if(CITY&&CITY.buildingAt(p.x,p.z)){p.addScaledVector(v,-dt*1.5);v.x*=-0.7;v.z*=-0.7;}
+ const kick=(x,z,pow)=>{const dx=p.x-x,dz=p.z-z,d=Math.hypot(dx,dz);if(d<0.9&&p.y<1.2){v.x=dx/d*pow;v.z=dz/d*pow;v.y=pow*0.45;}};kick(pl.x,pl.z,9);kick(pet.x,pet.z,6);if(room)room.ball();
+ ball.m.rotation.x+=v.z*dt*2.5;ball.m.rotation.z-=v.x*dt*2.5;if(Math.hypot(v.x,v.z)<0.3&&!petTarget&&Math.hypot(pet.x-p.x,pet.z-p.z)>1)petTarget=[p.x,p.z];}
+
+/* ---- 15. Play with friends: Trystero peer-to-peer (no server) ---- */
+let room=null;const friends=new Map();
+function friendModel(col){const g=new THREE.Group();S(0.5,col,0,0.55,0,g);S(0.38,col,0,1.15,0.1,g);S(0.12,'#222',-0.13,1.2,0.45,g);S(0.12,'#222',0.13,1.2,0.45,g);S(0.14,col,-0.25,1.5,0,g);S(0.14,col,0.25,1.5,0,g);return g;}
+async function joinFriends(code,name){const {joinRoom,selfId}=await import('https://esm.run/trystero@0.21');const r=joinRoom({appId:'buddy-world-hammad'},code);const [sendP,getP]=r.makeAction('pos'),[sendC,getC]=r.makeAction('chat'),[sendB,getB]=r.makeAction('ball');
+ const col=['#e06666','#6fa8dc','#93c47d','#ffd966','#c27ba0','#76a5af'][hashStr(selfId)%6];
+ getP((d,id)=>{let f=friends.get(id);if(!f){const g=friendModel(d.col);const lab=labelSprite(d.name,d.kind==='cat'?'🐱':'🐼');lab.position.y=2.4;setSpriteScale(lab,0.9);g.add(lab);world.add(g);f={g,lab};friends.set(id,f);showHint('🎉 '+d.name+' joined you!',4);}
+  const p=toL(d.lat,d.lon);f.tx=p[0];f.tz=p[1];f.g.rotation.y=d.ang;f.t=performance.now();if(Math.hypot(p[0],p[1])>O.R*2)f.g.visible=false;else f.g.visible=true;});
+ getC((t,id)=>{const f=friends.get(id);if(f){fxAt(innerWidth/2,innerHeight/3,'💬');showHint('💬 '+t,5);}});getB(d=>{if(!ball)spawnBall();const p=toL(d.lat,d.lon);ball.m.position.set(p[0],d.y,p[1]);ball.v.set(d.vx,d.vy,d.vz);});
+ r.onPeerLeave(id=>{const f=friends.get(id);if(f){world.remove(f.g);friends.delete(id);}});
+ let tp=0,tb=0;room={r,code,tick(dt){tp-=dt;if(tp<=0){tp=0.2;const ll=toLL(pet.x,pet.z);sendP({lat:ll[0],lon:ll[1],ang:pet.ang||0,name,kind,col});}friends.forEach(f=>{if(f.tx!=null){f.g.position.x+=(f.tx-f.g.position.x)*0.15;f.g.position.z+=(f.tz-f.g.position.z)*0.15;}if(performance.now()-f.t>15000)f.g.visible=false;});},
+  chat:t=>sendC(name+': '+t),ball(){tb-=0.016;if(tb<=0&&ball&&Math.hypot(ball.v.x,ball.v.z)>0.5){tb=0.15;const ll=toLL(ball.m.position.x,ball.m.position.z);sendB({lat:ll[0],lon:ll[1],y:ball.m.position.y,vx:ball.v.x,vy:ball.v.y,vz:ball.v.z});}}};}
+function openFriends(){const qs=new URLSearchParams(location.search);const code=qs.get('room')||Math.random().toString(36).slice(2,7);
+ card('👫 Play with friends','','<div>Friends open the same link and their buddy appears next to yours. Works peer-to-peer, no server, no sign-up.</div><div><b>Your name</b> <input id="fName" value="'+esc(localStorage.getItem('bw.name')||'Hammad')+'"></div><div><b>Room</b> '+esc(code)+'</div><button id="fGo">'+(room?'✅ Connected':'🔗 Start & copy invite link')+'</button>','<small>Trystero (WebRTC)</small>');
+ $('fGo').onclick=async()=>{const nm=$('fName').value.slice(0,20)||'Friend';try{localStorage.setItem('bw.name',nm);}catch(e){}const ll=[O.lat.toFixed(5),O.lon.toFixed(5)];const link=location.origin+location.pathname+'?room='+code+'&lat='+ll[0]+'&lon='+ll[1]+'&cc='+(O.cc||'')+'&n='+encodeURIComponent(O.name||'');
+  try{await navigator.clipboard.writeText(link);}catch(e){}$('fGo').textContent='Connecting…';try{if(!room)await joinFriends(code,nm);$('fGo').textContent='✅ Connected, invite link copied!';$('iWiki').innerHTML='<small style="word-break:break-all">'+esc(link)+'</small>';}catch(e){$('fGo').textContent='Could not connect: '+e.message;}};}
+
+/* ---------- wiring into the app ---------- */
+const XLAY=[['nature','🦊 Nature hunt','Real animals & plants spotted here (iNaturalist + GBIF). Buddy goes to find them'],['history','🕰️ Past buildings & roads','OpenHistoricalMap: things that existed in past years, on the history slider'],['oldmaps','🗺️ Old maps','Antique maps of this city from Wikimedia Commons & map archives'],['transit','🚌 Live buses & Tube (London)','TfL open data: real stops with live arrival times'],['news','📰 Live news here','GDELT: world news from the last 48 h, pinned where it mentions a place'],['hazards','🌋 Quakes & natural events','USGS earthquakes + NASA EONET fires, storms, volcanoes'],['radar','🌧️ Rain radar','RainViewer live radar loop in the corner'],['research','🎓 Research & papers','OpenAlex: universities & institutes here and their newest papers'],['street','📸 Street photos on tap','Panoramax: tap any street to see a real open street-level photo'],['overture','🏗️ Extra buildings','Overture Maps open buildings, fills gaps OSM is missing'],['radio','📻 Local radio','Radio Browser: real live stations from this area'],['music','🎵 Buddy music','Tone.js: calm music that changes with day, night and rain']];
+const _layerUI=layerUI;layerUI=function(){_layerUI();const box=$('layList');const h=document.createElement('div');h.style.cssText='grid-column:1/-1;font-weight:bold;margin-top:6px';h.textContent='✨ More open-source layers';box.appendChild(h);
+ XLAY.forEach(r=>{const b=document.createElement('button');b.className=LAY[r[0]]?'on':'';b.innerHTML=r[1]+'<br><small>'+r[2]+'</small>';b.style.textAlign='left';b.onclick=()=>{LAY[r[0]]=!LAY[r[0]];b.className=LAY[r[0]]?'on':'';applyLayer(r[0]);if(r[0]==='oldmaps'||r[0]==='radio'){LAY[r[0]]=false;b.className='';$('layers').style.display='none';}};box.appendChild(b);});
+ const h2=document.createElement('div');h2.style.cssText='grid-column:1/-1;font-weight:bold;margin-top:6px';h2.textContent='🎮 Play';box.appendChild(h2);
+ [['💬 Talk to Buddy','Chat, voice, mic, optional AI that runs in your browser',openChat],['⚽ Football','Walk into the ball to kick it (Space = jump in walk mode)',spawnBall],['👫 Play with friends','Share a link, see each other\'s buddies live',openFriends]].forEach(r=>{const b=document.createElement('button');b.innerHTML=r[0]+'<br><small>'+r[1]+'</small>';b.style.textAlign='left';b.onclick=()=>{$('layers').style.display='none';r[2]();};box.appendChild(b);});};
+const _applyLayer=applyLayer;applyLayer=function(k){_applyLayer(k);const on=LAY[k];
+ if(k==='history'){if(on)loadHistory();}if(k==='oldmaps'&&on)oldMaps();if(k==='transit'&&on)loadTransit();if(k==='news'&&on)loadNews();if(k==='hazards'&&on)loadHazards();if(k==='nature'&&on)loadNature();if(k==='research'&&on)loadResearch();
+ if(k==='radar'){if(on)loadRadar();else if($('radar'))$('radar').style.display='none';}if(k==='radio'&&on)openRadio();if(k==='music'){on?musicStart().catch(()=>showHint('Tap again to start music',3)):musicStop();}
+ if(k==='overture'){if(on)loadOverture();if(XM.over)XM.over.visible=on;}if(k==='street'&&on)showHint('📸 Tap any street to see a real photo from there.',4);};
+const _resetLayers=resetLayers;resetLayers=function(){_resetLayers();for(const k in X2)X2[k]=[];for(const k in XL)XL[k]=false;XM.hist=XM.over=null;hunt=null;O.cityName='';if(ball){world.remove(ball.m);ball=null;}if($('radar'))$('radar').style.display='none';radarFrames=[];};
+const _afterCity=afterCityLoaded;afterCityLoaded=function(){jget(`https://nominatim.openstreetmap.org/reverse?format=json&zoom=10&lat=${O.lat}&lon=${O.lon}`).then(j=>{const a=j.address||{};O.cityName=a.city||a.town||a.village||a.county||a.state||'';}).catch(()=>{}).finally(()=>_afterCity());};
+const _layerTap=layerTap;layerTap=function(r){const hits=r.intersectObjects(layerG.children.concat(inside?inside.g.children:[]),true).filter(h=>{let o=h.object;while(o){if(o.visible===false)return false;o=o.parent;}return true;});
+ if(hits.length){let o=hits[0].object;while(o&&!o.userData.card)o=o.parent;if(o){o.userData.card();return true;}}if(_layerTap(r))return true;
+ if(LAY.street&&CITY){const hb=r.intersectObject(CITY.bMesh),hg=r.intersectObjects(world.children.filter(m=>m.isMesh&&m!==CITY.bMesh&&!m.isInstancedMesh));if(hg.length&&(!hb.length||hg[0].distance<hb[0].distance))streetPhoto(hg[0].point.x,hg[0].point.z);}return false;};
+const _showInfo=showInfo;showInfo=async function(b,poi){await _showInfo(b,poi);const n=(poi&&poi.t.name)||(b&&(b.t.name||(b.pois&&b.pois[0]&&b.pois[0].t.name)));if(n)archivePhotos(n);};
+const _enterInside=enterInside;enterInside=async function(b){await _enterInside(b);if(!inside)return;const kt=poiKind(Object.assign({},b.t,...(b.pois||[]).map(p=>p.t)));if(/museum|gallery|arts_centre|castle|palace|attraction/.test(kt)||/museum|gallery/i.test(b.t.name||''))hangArt(b);};
+const _updLayers=updateLayers;updateLayers=function(dt){_updLayers(dt);updX2();updHistMesh();updTransit(dt);updRadar(dt);updHunt();updPhysics(dt);updShake(dt);if(room)room.tick(dt);};
+// open a shared invite link straight into the right place
+(()=>{const qs=new URLSearchParams(location.search);if(qs.get('lat')&&qs.get('lon'))setTimeout(()=>{goTo('📍 '+(qs.get('n')||'Shared place'),+qs.get('lat'),+qs.get('lon'),qs.get('cc')||'');if(qs.get('room'))setTimeout(openFriends,4000);},300);})();
+addEventListener('keydown',e=>{if(e.code==='KeyB'&&!e.target.closest('input'))spawnBall();if(e.code==='KeyT'&&!e.target.closest('input'))openChat();});
 
 }
 </script></body></html>
