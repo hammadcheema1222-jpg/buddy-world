@@ -1,0 +1,30 @@
+name: Build own London map (Protomaps)
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/protomaps.yml']
+permissions:
+  contents: write
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Get pmtiles CLI
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          gh release download -R protomaps/go-pmtiles -p '*Linux_x86_64.tar.gz' -O pm.tgz
+          tar xzf pm.tgz pmtiles
+      - name: Extract London from the latest Protomaps world build
+        run: |
+          KEY=$(curl -s https://build-metadata.protomaps.dev/builds.json | jq -r '.[-1].key')
+          mkdir -p assets/maps
+          ./pmtiles extract "https://build.protomaps.com/$KEY" assets/maps/london.pmtiles --bbox=-0.52,51.28,0.34,51.70 --maxzoom=14
+          ls -la assets/maps
+      - name: Commit
+        run: |
+          git config user.name "buddy-world-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add assets/maps/london.pmtiles
+          git commit -m "Update self-hosted London map (Protomaps)" || echo "no change"
+          git push

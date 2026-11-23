@@ -40,7 +40,7 @@ h1{font-size:26px;margin:0 0 4px}h3{margin:12px 0 2px;font-size:17px}p{margin:4p
 </div></div>
 <div id="places" class="over" style="display:none"><div class="card paper"><h1>🔍 Where next?</h1><div class="grid" id="pre2"></div>
 <div class="row"><input id="q2" placeholder="Search anywhere on Earth…"><button id="s2">Search</button></div><div class="res" id="r2"></div><div class="row"><button id="pClose">Close</button></div></div></div>
-<script src="https://unpkg.com/maplibre-gl@5.24.1/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/maplibre-gl@5.24.1/dist/maplibre-gl.js"></script><script src="https://unpkg.com/pmtiles@3.2.1/dist/pmtiles.js"></script><script src="https://unpkg.com/@protomaps/basemaps@5/dist/basemaps.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 {
@@ -111,7 +111,9 @@ function setPose(pose,t,moving){
 }
 
 /* ---------- map ---------- */
-const STYLE='https://tiles.openfreemap.org/styles/liberty';
+let STYLE='https://tiles.openfreemap.org/styles/liberty';const OWNMAP=(()=>{try{return localStorage.getItem('bw.ownmap')==='1';}catch(e){return false;}})();
+try{if(OWNMAP&&window.pmtiles&&window.basemaps){const pp=new pmtiles.Protocol();maplibregl.addProtocol('pmtiles',pp.tile);STYLE={version:8,glyphs:'https://protomaps.github.io/basemaps-assets/fonts/{fontstack}/{range}.pbf',sprite:'https://protomaps.github.io/basemaps-assets/sprites/v4/light',sources:{protomaps:{type:'vector',url:'pmtiles://'+new URL('assets/maps/london.pmtiles',location.href).href,attribution:'<a href="https://protomaps.com">Protomaps</a> © <a href="https://openstreetmap.org">OpenStreetMap</a>'}},layers:basemaps.layers('protomaps',basemaps.namedFlavor('light'),{lang:'en'})};}}catch(e){console.warn('own map off',e);}
+(()=>{const b=document.createElement('button');b.textContent=OWNMAP?'🗺️ Own map: ON':'🗺️ Own map: OFF';b.title='Self-hosted Protomaps map of London (PMTiles on GitHub). Off = OpenFreeMap';b.style.cssText='position:fixed;left:10px;bottom:34px;z-index:9;padding:6px 10px;border-radius:10px;border:2px solid #6b4f2e;background:#fbf6ea;font:14px Georgia,serif;cursor:pointer';b.onclick=()=>{try{localStorage.setItem('bw.ownmap',OWNMAP?'0':'1');}catch(e){}location.reload();};document.body.appendChild(b);})();
 const map=new maplibregl.Map({container:'map',style:STYLE,center:[10,25],zoom:1.6,pitch:0,maxPitch:80,attributionControl:{compact:true}});
 map.addControl(new maplibregl.NavigationControl({visualizePitch:true}),'bottom-right');
 let sat=sget('bl.sat')==='1',firstSymbol=null,ready=false;
