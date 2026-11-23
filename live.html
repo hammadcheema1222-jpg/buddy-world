@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Buddy Earth Live — explore the real world with Buddy</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.1/dist/maplibre-gl.css">
+<style>
+html,body{margin:0;height:100%;overflow:hidden;font-family:Georgia,'Times New Roman',serif;color:#3d2c17;background:#0b1530}
+#map{position:fixed;inset:0}
+.paper{background:rgba(244,234,213,.95);border:2px solid #6b4f2e;border-radius:12px;box-shadow:0 3px 0 #6b4f2e}
+button{font:inherit;font-size:14px;background:#fbf5e6;border:1.5px solid #8a6a40;border-radius:8px;padding:6px 9px;color:#3d2c17;min-height:36px;cursor:pointer}
+button:hover{background:#f3e8cf}button.on{background:#e9dcbc;box-shadow:inset 0 0 0 2px #6b4f2e}
+input{font:inherit;font-size:16px;padding:7px 10px;border:1.5px solid #8a6a40;border-radius:8px;background:#fffdf7;min-width:0;flex:1}
+#top{position:fixed;right:8px;top:8px;display:flex;flex-wrap:wrap;gap:5px;padding:5px 6px;justify-content:flex-end;max-width:66vw;z-index:2}
+#info{position:fixed;left:8px;top:8px;padding:6px 12px;max-width:38vw;z-index:2}
+#place{font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#coords{font-size:12px;opacity:.75}
+#bubble{position:fixed;left:0;top:0;padding:7px 12px;font-size:17px;pointer-events:none;display:none;white-space:nowrap;border-radius:12px;z-index:3}
+#bubble:after{content:'';position:absolute;left:50%;bottom:-9px;margin-left:-7px;border:7px solid transparent;border-top-color:#6b4f2e;border-bottom:0}
+.fx{position:fixed;pointer-events:none;font-size:24px;transition:transform 1.4s ease-out,opacity 1.4s ease-out;z-index:5}
+#hint{position:fixed;left:50%;top:64px;transform:translateX(-50%);padding:6px 12px;font-size:14px;display:none;white-space:nowrap;max-width:94vw;overflow:hidden;text-overflow:ellipsis;z-index:2}
+#joy{position:fixed;left:24px;bottom:40px;width:130px;height:130px;border-radius:50%;background:rgba(251,245,230,.4);border:2px solid rgba(107,79,46,.6);z-index:2;touch-action:none}
+#knob{position:absolute;left:40px;top:40px;width:50px;height:50px;border-radius:50%;background:rgba(251,245,230,.92);border:2px solid #6b4f2e}
+.over{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(20,14,8,.5);z-index:10}
+.card{padding:18px 22px;max-width:min(880px,94vw);max-height:90vh;overflow:auto}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px;margin:8px 0}
+.row{display:flex;gap:8px;margin:8px 0}.res{display:flex;flex-direction:column;gap:5px}.res button{text-align:left}
+h1{font-size:26px;margin:0 0 4px}h3{margin:12px 0 2px;font-size:17px}p{margin:4px 0}small{opacity:.8}
+.maplibregl-ctrl-attrib{font-size:11px}
+</style></head><body>
+<div id="map"></div>
+<div id="info" class="paper"><div id="place">🌍 Buddy Earth Live</div><div id="coords"></div></div>
+<div id="top" class="paper"><button id="bPlaces">🔍 Places</button><button id="bFollow" class="on">🐾 Walk with Buddy</button><button id="bFree">🌐 Free look</button><button id="bGlobe">🌍 Globe</button><button id="bSat">🛰️ Satellite</button><button id="bKind">🐼 Panda</button><button id="bFs">⛶</button></div>
+<div id="bubble" class="paper"></div><div id="hint" class="paper"></div>
+<div id="joy"><div id="knob"></div></div>
+<div id="start" class="over"><div class="card paper">
+<h1>🌍 Buddy Earth Live</h1>
+<p>The real world on a live online map: real streets, real 3D buildings, real mountains and satellite photos, all over the globe. Pick a place and walk it with Buddy.</p>
+<h3>Famous places</h3><div class="grid" id="pre1"></div>
+<h3>Or go anywhere</h3><div class="row"><input id="q1" placeholder="Type any place: a city, street, mountain…"><button id="s1">Search</button></div><div class="res" id="r1"></div>
+<p><small>Walk: W / ↑ forward · S / ↓ back · A D / ← → turn · Shift = run · or use the circle. Click the map and Buddy walks there. Scroll to zoom, right-drag to tilt.</small></p>
+</div></div>
+<div id="places" class="over" style="display:none"><div class="card paper"><h1>🔍 Where next?</h1><div class="grid" id="pre2"></div>
+<div class="row"><input id="q2" placeholder="Search anywhere on Earth…"><button id="s2">Search</button></div><div class="res" id="r2"></div><div class="row"><button id="pClose">Close</button></div></div></div>
+<script src="https://unpkg.com/maplibre-gl@5.24.1/dist/maplibre-gl.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+{
+'use strict';
+const $=id=>document.getElementById(id);
+if(!window.maplibregl||!window.THREE){document.body.innerHTML='<p style="padding:30px;color:#fff">Could not load the map engine — check the internet connection.</p>';throw new Error('libs');}
+const sget=k=>{try{return localStorage.getItem(k);}catch(e){return null;}};const sset=(k,v)=>{try{localStorage.setItem(k,v);}catch(e){}};
+let kind=sget('bh.kind')||'cat';const pickR=a=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+/* ---------- Buddy model (three.js) ---------- */
+const scene=new THREE.Scene();scene.add(new THREE.HemisphereLight(0xffffff,0x8a7a60,0.9));const dl=new THREE.DirectionalLight(0xffffff,0.6);dl.position.set(1,2,1.5);scene.add(dl);scene.add(new THREE.AmbientLight(0xffffff,0.2));
+const TAPPABLE=[];
+const GB=new THREE.BoxGeometry(1,1,1),GS=new THREE.SphereGeometry(1,16,12),GC=new THREE.CylinderGeometry(1,1,1,12),MC={};
+function M(c,e){const k=c+'|'+(e||'');if(!MC[k])MC[k]=new THREE.MeshLambertMaterial({color:c,emissive:e||0x000000});return MC[k];}
+function B(w,h,d,c,x,y,z,p,e){const m=new THREE.Mesh(GB,typeof c==='string'?M(c,e):c);m.scale.set(w,h,d);m.position.set(x,y+h/2,z);(p||scene).add(m);return m;}
+function S(r,c,x,y,z,p,sx,sy,sz,e){const m=new THREE.Mesh(GS,M(c,e));m.scale.set(r*(sx||1),r*(sy||1),r*(sz||1));m.position.set(x,y,z);(p||scene).add(m);return m;}
+function C(r,h,c,x,y,z,p,e){const m=new THREE.Mesh(GC,M(c,e));m.scale.set(r,h,r);m.position.set(x,y+h/2,z);(p||scene).add(m);return m;}
+function grp(p,act){const g=new THREE.Group();(p||scene).add(g);if(act){g.userData.act=act;TAPPABLE.push(g);}return g;}
+const pet={root:null,parts:null,x:1,y:0,z:5,ang:Math.PI,path:[],act:'wander',timer:3,arrived:false,hidden:false,carry:false,happy:0,waveT:0,say:'',sayT:0,chatT:16,yo:0,look:null};
+function buildPet(){
+ if(pet.root)scene.remove(pet.root);
+ const cat=kind==='cat',cB=cat?'#f4b469':'#fbfaf5',cD=cat?'#d9893f':'#2c2c2c',cL=cat?'#fff3e2':'#ffffff',limbC=cat?cB:cD;
+ const root=new THREE.Group(),P={};scene.add(root);
+ P.torso=S(1,cB,0,0,0,root);P.chest=S(1,cat?cL:cD,0,0,0,root);
+ P.head=grp(root);const h=P.head;S(0.26,cB,0,0,0,h);
+ if(cat){[1,-1].forEach(s=>{const e=new THREE.Mesh(new THREE.ConeGeometry(0.09,0.17,4),M(cB));e.position.set(0.14*s,0.22,0);e.rotation.z=-0.35*s;h.add(e);const ei=new THREE.Mesh(new THREE.ConeGeometry(0.05,0.1,4),M('#f6a9a0'));ei.position.set(0.14*s,0.21,0.04);ei.rotation.z=-0.35*s;h.add(ei);});
+  [-0.07,0,0.07].forEach(x=>B(0.025,0.06,0.02,cD,x,0.17,0.2,h));}
+ else{[1,-1].forEach(s=>S(0.085,cD,0.17*s,0.2,-0.02,h));}
+ P.eyes=grp(h);P.eyes.position.set(0,0.02,0.2);
+ [1,-1].forEach(s=>{if(!cat){const pch=S(0.07,cD,0.095*s,-0.005,0.005,P.eyes,0.85,1.15,0.6);pch.rotation.z=0.5*s;}S(0.045,cat?'#2b2220':'#fbfbfb',0.095*s,0,0.03,P.eyes,1,1.15,0.7);S(0.025,cat?'#ffffff':'#1a1a1a',0.1*s,0.012,0.06,P.eyes);});
+ S(0.1,cL,0,-0.08,0.2,h,1.2,0.8,0.6);S(0.03,cat?'#e8848a':'#1a1a1a',0,-0.04,0.26,h,1.2,0.9,0.8);
+ [1,-1].forEach(s=>S(0.045,'#f39aa4',0.16*s,-0.06,0.19,h,1,0.6,0.4));
+ P.legs=[];[[0.12,0.21],[-0.12,0.21],[0.12,-0.2],[-0.12,-0.2]].forEach(q=>{const lg=grp(root);lg.userData.base=q;C(0.065,0.26,limbC,0,-0.26,0,lg);S(0.075,limbC,0,-0.27,0.02,lg,1,0.8,1.2);P.legs.push(lg);});
+ P.tail=grp(root);if(cat){for(let i=0;i<5;i++)S(0.055,i>3?cD:cB,0,i*0.08,-i*0.035,P.tail);}else S(0.08,'#fbfaf5',0,0,0,P.tail);
+ P.book=B(0.22,0.28,0.05,'#5b8bd6',0,0,0,root);P.book.visible=false;
+ const sh=new THREE.Mesh(new THREE.CircleGeometry(0.35,16),new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:0.18,depthWrite:false}));sh.rotation.x=-Math.PI/2;sh.position.y=0.01;root.add(sh);P.shadow=sh;
+ P.rod=grp(root);{const r=new THREE.Mesh(GC,M('#6b4a2b'));r.scale.set(0.02,1.3,0.02);r.position.set(0.1,0.95,0.75);r.rotation.x=1.0;P.rod.add(r);const ln=new THREE.Mesh(GC,M('#ffffff'));ln.scale.set(0.006,1.4,0.006);ln.position.set(0.1,0.65,1.32);P.rod.add(ln);S(0.05,'#d9534f',0.1,-0.05,1.32,P.rod);}P.rod.visible=false;P.umb=grp(root);C(0.015,1.1,'#555',0.18,0.55,0,P.umb);{const u=new THREE.Mesh(new THREE.ConeGeometry(0.62,0.32,10),M('#d9534f'));u.position.set(0.18,1.75,0);P.umb.add(u);}P.umb.visible=false;P.cone=grp(root);{const c=new THREE.Mesh(new THREE.ConeGeometry(0.06,0.18,8),M('#d9a35a'));c.rotation.x=Math.PI;c.position.set(0.1,0.72,0.36);P.cone.add(c);S(0.07,'#f7c6d0',0.1,0.84,0.36,P.cone);}P.cone.visible=false;root.scale.setScalar(1.35);pet.root=root;pet.parts=P;
+}
+function setPose(pose,t,moving){
+ const P=pet.parts,head=P.head,legs=P.legs;let blink=(t%4)<0.12||pet.happy>0||pose==='sleep'||pose==='eat';
+ P.torso.visible=P.chest.visible=P.tail.visible=true;legs.forEach(l=>l.visible=true);P.book.visible=false;P.shadow.visible=true;head.rotation.set(0,0,0);
+ if(pose==='head'){P.torso.visible=P.chest.visible=P.tail.visible=false;legs.forEach(l=>l.visible=false);P.shadow.visible=false;head.position.set(0,0.12+Math.sin(t*2)*0.02,0);head.rotation.z=Math.sin(t*1.5)*0.1;P.eyes.scale.y=blink?0.15:1;return;}
+ if(pose==='sleep'){P.torso.position.set(0,0.2,0);P.torso.scale.set(0.32,0.2,0.4);P.chest.position.set(0,0.2,0.12);P.chest.scale.set(0.2,0.15,0.2);head.position.set(0.05,0.24,0.4);head.rotation.set(0.15,0,0.45);
+  legs.forEach((l,i)=>{l.position.set(l.userData.base[0],0.2,l.userData.base[1]);l.rotation.set(-1.5,0,0);});P.tail.position.set(0.1,0.15,-0.38);P.tail.rotation.set(-1.4,0.9,0);P.eyes.scale.y=0.12;
+  head.position.y+=Math.sin(t*1.6)*0.01;return;}
+ const quad=pose==='walk'||pose==='run'||pose==='eat'||pose==='stand4';
+ if(quad){const sp=pose==='run'?16:10,a=moving?Math.sin(t*sp)*0.55:0,bob=moving?Math.abs(Math.cos(t*sp))*0.03:0;
+  P.torso.position.set(0,0.38+bob,0);P.torso.scale.set(0.27,0.24,0.4);P.chest.position.set(0,0.36+bob,0.15);
+  if(kind==='cat')P.chest.scale.set(0.2,0.18,0.25);else{P.chest.scale.set(0.28,0.25,0.15);P.chest.position.z=0.12;}
+  head.position.set(0,0.66+bob,0.36);if(pose==='eat'){head.position.set(0,0.42+Math.abs(Math.sin(t*5))*0.04,0.48);head.rotation.x=0.5;}
+  legs.forEach((l,i)=>{const s=(i===0||i===3)?1:-1;l.position.set(l.userData.base[0],0.32+bob,l.userData.base[1]);l.rotation.set(a*s,0,0);});
+  P.tail.position.set(0,0.48+bob,-0.38);P.tail.rotation.set(-0.3+Math.sin(t*3)*0.15,Math.sin(t*2)*0.2,0);P.eyes.scale.y=blink?0.15:1;return;}
+ // upright poses: sit, stand2, play, dance, wave, read, swing, paint, piano
+ let bob=0,spin=0;if(pose==='play'||pose==='dance')bob=Math.abs(Math.sin(t*6))*0.15;if(pose==='dance')spin=Math.sin(t*4)*0.5;
+ P.torso.position.set(0,0.36+bob,-0.02);P.torso.scale.set(0.27,0.33,0.27);P.chest.position.set(0,0.4+bob,0.12);
+ if(kind==='cat')P.chest.scale.set(0.19,0.24,0.18);else{P.chest.scale.set(0.28,0.12,0.28);P.chest.position.set(0,0.56+bob,-0.02);}
+ head.position.set(0,0.86+bob,0.06);head.rotation.y=spin;if(pose==='stars'){head.rotation.x=-0.5;}
+ const fr=legs[0],fl=legs[1],br=legs[2],bl=legs[3];
+ br.position.set(0.15,0.18,0.02);bl.position.set(-0.15,0.18,0.02);br.rotation.set(-1.45,0,0);bl.rotation.set(-1.45,0,0);
+ fr.position.set(0.11,0.5+bob,0.14);fl.position.set(-0.11,0.5+bob,0.14);fr.rotation.set(0,0,0);fl.rotation.set(0,0,0);
+ if(pose==='stand2'||pose==='paint'||pose==='piano'||pose==='stars'||pose==='arcade'){const k=pose==='piano'||pose==='arcade'?Math.sin(t*10)*0.25:pose==='paint'?Math.sin(t*5)*0.3:0;fr.rotation.x=-1.2+k;fl.rotation.x=-1.2-k;if(pose==='stars')fr.rotation.x=fl.rotation.x=-2;}
+ if(pose==='play'||pose==='dance'){fr.rotation.x=-2.4+Math.sin(t*6)*0.4;fl.rotation.x=-2.4-Math.sin(t*6)*0.4;}
+ if(pose==='wave'){fr.rotation.x=-2.6;fr.rotation.z=Math.sin(t*12)*0.4;}
+ if(pose==='read'){fr.rotation.x=fl.rotation.x=-1.1;P.book.visible=true;P.book.position.set(0,0.62,0.36);P.book.rotation.x=-0.4;head.rotation.x=0.25;}
+ if(pose==='swing'){fr.rotation.x=fl.rotation.x=-2.8;}
+ if(pet.carry){fr.rotation.x=fl.rotation.x=-2.9;}
+ P.tail.position.set(0,0.1,-0.28);P.tail.rotation.set(-1.3,0.5+Math.sin(t*2)*0.2,0);
+ P.eyes.scale.y=blink?0.15:1;
+}
+
+/* ---------- map ---------- */
+const STYLE='https://tiles.openfreemap.org/styles/liberty';
+const map=new maplibregl.Map({container:'map',style:STYLE,center:[10,25],zoom:1.6,pitch:0,maxPitch:80,attributionControl:{compact:true}});
+map.addControl(new maplibregl.NavigationControl({visualizePitch:true}),'bottom-right');
+let sat=sget('bl.sat')==='1',firstSymbol=null,ready=false;
+const B0={lng:-0.1246,lat:51.5007,h:0,target:null,alt:0};let follow=true;
+map.on('style.load',()=>{
+ try{map.setProjection({type:'globe'});}catch(e){}
+ const layers=map.getStyle().layers;firstSymbol=(layers.find(l=>l.type==='symbol')||{}).id;
+ map.addSource('esri',{type:'raster',tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],tileSize:256,maxzoom:19,attribution:'Imagery © Esri, Maxar, Earthstar Geographics'});
+ map.addLayer({id:'satellite',type:'raster',source:'esri',layout:{visibility:sat?'visible':'none'}},firstSymbol);
+ map.addSource('dem',{type:'raster-dem',tiles:['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],tileSize:256,encoding:'terrarium',maxzoom:15,attribution:'Elevation: Mapzen / AWS Terrain Tiles'});
+ map.addSource('dem2',{type:'raster-dem',tiles:['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],tileSize:256,encoding:'terrarium',maxzoom:15});
+ map.addLayer({id:'hills',type:'hillshade',source:'dem2',paint:{'hillshade-exaggeration':0.35,'hillshade-shadow-color':'#5a4a3a'}},firstSymbol);
+ map.setTerrain({source:'dem',exaggeration:1.15});
+ if(!layers.some(l=>l.type==='fill-extrusion')){const src=Object.keys(map.getStyle().sources).find(s=>map.getStyle().sources[s].type==='vector');
+  if(src)map.addLayer({id:'b3d',type:'fill-extrusion',source:src,'source-layer':'building',minzoom:14,paint:{'fill-extrusion-color':'#e2d6c6','fill-extrusion-height':['coalesce',['get','render_height'],10],'fill-extrusion-base':['coalesce',['get','render_min_height'],0],'fill-extrusion-opacity':0.92}},firstSymbol);}
+ try{map.setSky({'sky-color':'#8ec3ea','horizon-color':'#d9ecf7','fog-color':'#e6f0f5','sky-horizon-blend':0.6,'horizon-fog-blend':0.5,'fog-ground-blend':0.4,'atmosphere-blend':['interpolate',['linear'],['zoom'],0,1,10,1,12,0]});}catch(e){}
+ map.addLayer(buddyLayer);ready=true;updateSatBtn();});
+/* custom three.js layer that draws Buddy on the real map */
+let renderer=null,cam3=new THREE.Camera();const mpp=()=>78271.517*Math.cos(B0.lat*Math.PI/180)/Math.pow(2,map.getZoom());
+const buddyLayer={id:'buddy',type:'custom',renderingMode:'3d',
+ onAdd(m,gl){renderer=new THREE.WebGLRenderer({canvas:m.getCanvas(),context:gl,antialias:true});renderer.autoClear=false;},
+ render(gl,args){if(!pet.root)return;const size=clamp(mpp()*70,0.9,4e5);pet.root.scale.setScalar(size/0.95);
+  const alt=B0.alt;let mm;try{mm=map.transform.getMatrixForModel([B0.lng,B0.lat],alt);}catch(e){return;}
+  const m=new THREE.Matrix4().fromArray(args.defaultProjectionData.mainMatrix),l=new THREE.Matrix4().fromArray(mm);
+  cam3.projectionMatrix=m.multiply(l);renderer.resetState();renderer.render(scene,cam3);}};
+/* ---------- movement ---------- */
+const keys={};addEventListener('keydown',e=>{if(e.target.tagName==='INPUT')return;keys[e.code]=true;if(['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)&&follow)e.preventDefault();if(e.code==='KeyP')openPlaces();});
+addEventListener('keyup',e=>{keys[e.code]=false;});
+const joyV=[0,0];
+function stepBuddy(dt){let f=0,t=0;if(keys.KeyW||keys.ArrowUp)f+=1;if(keys.KeyS||keys.ArrowDown)f-=1;if(keys.KeyA||keys.ArrowLeft)t-=1;if(keys.KeyD||keys.ArrowRight)t+=1;f+=-joyV[1];t+=joyV[0];
+ const run=keys.ShiftLeft||keys.ShiftRight,pxs=(run?260:110);let moving=false;
+ if(Math.abs(t)>0.05){B0.h=(B0.h+t*(follow?70:120)*dt+360)%360;B0.target=null;}
+ if(Math.abs(f)>0.05){B0.target=null;const d=f*pxs*mpp()*dt;moveDir(B0.h,d);moving=true;}
+ else if(B0.target){const tg=B0.target,dy=(tg[1]-B0.lat)*111320,dx=(tg[0]-B0.lng)*111320*Math.cos(B0.lat*Math.PI/180),dist=Math.hypot(dx,dy),step=pxs*1.3*mpp()*dt;
+  if(dist<=step){B0.lng=tg[0];B0.lat=tg[1];B0.target=null;onArrive();}else{const hh=Math.atan2(dx,dy)*180/Math.PI;B0.h=(hh+360)%360;moveDir(B0.h,step);moving=true;}}
+ const el=map.queryTerrainElevation?map.queryTerrainElevation([B0.lng,B0.lat]):0;if(el!==null&&isFinite(el))B0.alt+= (el-B0.alt)*Math.min(1,dt*8);
+ return moving;}
+function moveDir(h,d){const r=h*Math.PI/180;B0.lat=clamp(B0.lat+Math.cos(r)*d/111320,-85,85);B0.lng+=Math.sin(r)*d/(111320*Math.cos(B0.lat*Math.PI/180));if(B0.lng>180)B0.lng-=360;if(B0.lng<-180)B0.lng+=360;}
+function onArrive(){say(pickR(['We made it! 🐾','Here we are!','Ooh, what\'s around here?','Nice spot! 📸']),3);}
+/* joystick */
+const joy=$('joy'),knob=$('knob');let joyId=null;
+joy.addEventListener('pointerdown',e=>{joyId=e.pointerId;try{joy.setPointerCapture(e.pointerId);}catch(_){}joyMove(e);e.stopPropagation();});
+joy.addEventListener('pointermove',e=>{if(e.pointerId===joyId)joyMove(e);});
+const joyEnd=e=>{if(e.pointerId!==joyId)return;joyId=null;joyV[0]=joyV[1]=0;knob.style.left='40px';knob.style.top='40px';};joy.addEventListener('pointerup',joyEnd);joy.addEventListener('pointercancel',joyEnd);
+function joyMove(e){const r=joy.getBoundingClientRect();let x=(e.clientX-r.left-65)/50,y=(e.clientY-r.top-65)/50;const m=Math.hypot(x,y);if(m>1){x/=m;y/=m;}joyV[0]=x;joyV[1]=y;knob.style.left=(40+x*40)+'px';knob.style.top=(40+y*40)+'px';}
+/* clicks */
+map.on('click',e=>{const p=map.project([B0.lng,B0.lat]);const sz=Math.max(40,70);
+ if(Math.hypot(e.point.x-p.x,e.point.y-(p.y-35))<sz){pet.waveT=1.4;pet.happy=2.5;say(pickR(['Hi!! 👋','The real world is huge!','Take a photo of me here! 📸','I love exploring with you 💛',kind==='cat'?'Meow! 🐾':'Panda power! 🐼']));fxAt(e.originalEvent.clientX,e.originalEvent.clientY-30,'❤️');return;}
+ if(map.getZoom()<12){B0.lng=e.lngLat.lng;B0.lat=e.lngLat.lat;flyBuddy(16.5);say('Wheee, let\'s go here! ✈️',3);return;}
+ B0.target=[e.lngLat.lng,e.lngLat.lat];fxAt(e.originalEvent.clientX,e.originalEvent.clientY,'👣');});
+/* ---------- modes ---------- */
+function setFollow(on){follow=on;$('bFollow').classList.toggle('on',on);$('bFree').classList.toggle('on',!on);$('joy').style.display=on?'block':'none';
+ if(on){map.dragRotate.disable();map.dragPan.disable();map.keyboard.disable();map.easeTo({center:[B0.lng,B0.lat],zoom:Math.max(map.getZoom(),16.8),pitch:62,bearing:B0.h,duration:1200});showHint('Walk with W A S D / arrows (Shift to run) or the circle · click the map and Buddy walks there',6);}
+ else{map.dragRotate.enable();map.dragPan.enable();map.keyboard.enable();showHint('Free look: drag to move, right-drag to tilt and turn, scroll to zoom · click the map to send Buddy',5);}}
+$('bFollow').onclick=()=>setFollow(true);$('bFree').onclick=()=>setFollow(false);
+$('bGlobe').onclick=()=>{setFollow(false);map.flyTo({center:[B0.lng,B0.lat],zoom:1.8,pitch:0,bearing:0,duration:3500});};
+function updateSatBtn(){$('bSat').textContent=sat?'🗺️ Street map':'🛰️ Satellite';}
+$('bSat').onclick=()=>{sat=!sat;sset('bl.sat',sat?'1':'0');if(ready)map.setLayoutProperty('satellite','visibility',sat?'visible':'none');updateSatBtn();};updateSatBtn();
+const kindLabel=()=>{$('bKind').textContent=kind==='cat'?'🐼 Panda':'🐱 Cat';};kindLabel();
+$('bKind').onclick=()=>{kind=kind==='cat'?'panda':'cat';sset('bh.kind',kind);kindLabel();buildPet();say(kind==='cat'?'Meow! 🐱':'Panda here! 🐼');};
+$('bFs').onclick=()=>{const d=document.documentElement,f=d.requestFullscreen||d.webkitRequestFullscreen;try{f&&f.call(d);}catch(e){}};
+/* ---------- places & search ---------- */
+const PRESETS=[['🇬🇧 Big Ben, London',51.5005,-0.1246],['🇬🇧 Tower Bridge, London',51.5052,-0.0754],['🇫🇷 Eiffel Tower, Paris',48.8575,2.2945],['🇮🇹 Colosseum, Rome',41.8895,12.4922],
+ ['🇵🇰 Minar-e-Pakistan, Lahore',31.5918,74.3095],['🇵🇰 Badshahi Mosque, Lahore',31.5876,74.3100],['🇵🇰 Faisal Mosque, Islamabad',33.7275,73.0372],['🇵🇰 Hunza Valley',36.3167,74.65,13],
+ ['🇵🇰 K2',35.86,76.51,12.5],['🇦🇪 Burj Khalifa, Dubai',25.195,55.2744],['🇺🇸 Times Square, New York',40.758,-73.9855],['🇯🇵 Shibuya Crossing, Tokyo',35.6595,139.7005],
+ ['🇪🇬 Pyramids of Giza',29.976,31.1342,15.5],['🇨🇭 Matterhorn',45.9763,7.6586,12.8],['🇺🇸 Grand Canyon',36.06,-112.14,12.5],['🇦🇺 Sydney Opera House',-33.857,151.2153],
+ ['🇸🇦 Makkah Clock Tower',21.4189,39.8262],['🇮🇳 Taj Mahal, Agra',27.1745,78.0421],['🇧🇷 Christ the Redeemer, Rio',-22.9515,-43.2105,15.5],['🇳🇵 Mount Everest',27.9881,86.925,12]];
+let placeName='';
+function goTo(name,lat,lng,z){$('start').style.display='none';$('places').style.display='none';B0.lng=lng;B0.lat=lat;B0.target=null;placeName=name;$('place').textContent=name;lastGeo={lat:999,lng:999,t:0};
+ flyBuddy(z||16.8);setTimeout(()=>say(pickR(['We\'re really here! 🌍','Real world adventure! ✨','Wow, look at this place!']),4),3800);}
+function flyBuddy(z){if(follow){follow=false;map.dragPan.enable();}map.flyTo({center:[B0.lng,B0.lat],zoom:z,pitch:z>14?62:55,bearing:B0.h,duration:4200,essential:true});
+ map.once('moveend',()=>{if(z>14)setFollow(true);else setFollow(false);});}
+function fill(box){PRESETS.forEach(p=>{const b=document.createElement('button');b.textContent=p[0];b.onclick=()=>goTo(p[0],p[1],p[2],p[3]);box.appendChild(b);});}fill($('pre1'));fill($('pre2'));
+async function search(q,box){box.innerHTML='<i>Searching…</i>';try{const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=6&q='+encodeURIComponent(q));const d=await r.json();box.innerHTML='';
+ if(!d.length){box.innerHTML='<i>Nothing found — try another name.</i>';return;}
+ d.forEach(it=>{const b=document.createElement('button');b.textContent='📍 '+it.display_name.split(',').slice(0,3).join(',');const nat=it.class==='natural'||/peak|mountain|valley|volcano/.test(it.type);b.onclick=()=>goTo('📍 '+it.display_name.split(',')[0],+it.lat,+it.lon,nat?12.8:16.8);box.appendChild(b);});}
+ catch(e){box.innerHTML='<i>Search needs internet.</i>';}}
+[['q1','r1','s1'],['q2','r2','s2']].forEach(a=>{const go=()=>{const v=$(a[0]).value.trim();if(v)search(v,$(a[1]));};$(a[2]).onclick=go;$(a[0]).addEventListener('keydown',e=>{if(e.key==='Enter')go();});});
+function openPlaces(){$('places').style.display='flex';}$('bPlaces').onclick=openPlaces;$('pClose').onclick=()=>{$('places').style.display='none';};
+let lastGeo={lat:999,lng:999,t:0};const seen={};
+async function revGeo(now){const d=Math.hypot((B0.lat-lastGeo.lat)*111320,(B0.lng-lastGeo.lng)*111320*Math.cos(B0.lat*Math.PI/180));if(now-lastGeo.t<10000||d<300||map.getZoom()<12)return;lastGeo={lat:B0.lat,lng:B0.lng,t:now};
+ try{const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&zoom=17&lat=${B0.lat}&lon=${B0.lng}`);const j=await r.json();const a=j.address||{};
+  const loc=a.road||a.pedestrian||a.neighbourhood||a.suburb||a.village||'',city=a.city||a.town||a.village||a.county||a.state||'',c=a.country||'';const label=[loc,city,c].filter(Boolean).filter((v,i,x)=>x.indexOf(v)===i).join(', ');
+  if(label){$('place').textContent='📍 '+label;const key=a.suburb||a.neighbourhood||city;if(key&&!seen[key]){seen[key]=1;say('We\'re in '+key+(city&&city!==key?', '+city:'')+'! 🗺️',4.5);}}}catch(e){}}
+/* ---------- UI helpers ---------- */
+function fxAt(x,y,s){const d=document.createElement('div');d.className='fx';d.textContent=s;d.style.left=(x-12)+'px';d.style.top=(y-14)+'px';document.body.appendChild(d);requestAnimationFrame(()=>{d.style.transform='translateY(-50px)';d.style.opacity='0';});setTimeout(()=>d.remove(),1500);}
+let hintT=0;function showHint(t,s){const h=$('hint');h.textContent=t;h.style.display='block';hintT=s||4;}
+const say=(t,s)=>{pet.say=t;pet.sayT=s||3.8;};
+/* ---------- loop ---------- */
+let T=0,last=0,geoT=0;const bub=$('bubble');
+function frame(now){requestAnimationFrame(frame);if(!last)last=now;const dt=Math.min(0.1,(now-last)/1000);last=now;T+=dt;
+ if(hintT>0){hintT-=dt;if(hintT<=0)$('hint').style.display='none';}
+ if(!ready||!pet.root)return;const moving=stepBuddy(dt);
+ if(follow&&!map.isMoving()){map.jumpTo({center:[B0.lng,B0.lat],bearing:B0.h});}
+ let pose=moving?((keys.ShiftLeft||keys.ShiftRight)?'run':'walk'):(pet.waveT>0?'wave':((T%28)<5?'stars':'sit'));
+ const r=B0.h*Math.PI/180;pet.ang=Math.atan2(Math.sin(r),-Math.cos(r));
+ setPose(pose,T,moving);pet.root.position.set(0,0,0);pet.root.rotation.y=pet.ang;
+ if(pet.sayT>0)pet.sayT-=dt;if(pet.waveT>0)pet.waveT-=dt;if(pet.happy>0)pet.happy-=dt;
+ pet.chatT-=dt;if(pet.chatT<=0){pet.chatT=26+Math.random()*26;if(map.getZoom()>12)say(pickR(['Ooh, look at that building!','So many streets to explore 🗺️','Real world adventure! 🌍','Where shall we go next?','I can see so much from here!']));}
+ const p=map.project([B0.lng,B0.lat]);
+ if(pet.sayT>0&&pet.say&&p.x>-50&&p.x<innerWidth+50&&p.y>0&&p.y<innerHeight+100){bub.style.display='block';bub.textContent=pet.say;const bw=bub.offsetWidth;bub.style.left=clamp(p.x-bw/2,6,innerWidth-bw-6)+'px';bub.style.top=clamp(p.y-130-bub.offsetHeight,60,innerHeight-120)+'px';}else bub.style.display='none';
+ $('coords').textContent=B0.lat.toFixed(5)+', '+B0.lng.toFixed(5)+' · zoom '+map.getZoom().toFixed(1);
+ geoT-=dt;if(geoT<=0){geoT=2;revGeo(now);}
+ map.triggerRepaint();}
+buildPet();requestAnimationFrame(frame);setFollow(false);$('joy').style.display='none';
+}
+</script></body></html>
