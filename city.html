@@ -32,12 +32,12 @@ h1{font-size:26px;margin:0 0 4px}h3{margin:12px 0 2px;font-size:17px}p{margin:4p
 #iImg img{width:100%;max-height:300px;object-fit:cover;border-radius:10px;border:2px solid #6b4f2e;margin:8px 0}#iWiki{font-size:14px;line-height:1.5;margin-top:6px}
 </style></head><body>
 <canvas id="c"></canvas>
-<div id="hud" class="paper"><div id="place">🏙️ Buddy City</div><div id="clock"></div><div id="coords"></div></div>
-<div id="top" class="paper"><button id="bPlaces">🔍 Places</button><button id="mWalk">🚶 Walk</button><button id="mFly">✈️ Fly</button><button id="mMap" class="on">🗺️ Overview</button><button id="bKind">🐼 Panda</button><button id="bFs">⛶</button></div>
+<div id="hud" class="paper"><div id="place">🏙️ Buddy City</div><div id="clock"></div><div id="wx" style="font-size:12px"></div><div id="coords"></div></div>
+<div id="top" class="paper"><button id="bPlaces">🔍 Places</button><button id="bLayers">🧭 Layers</button><button id="mWalk">🚶 Walk</button><button id="mFly">✈️ Fly</button><button id="mMap" class="on">🗺️ Overview</button><button id="bKind">🐼 Panda</button><button id="bFs">⛶</button></div>
 <div id="timebar" class="paper"><span>☀️ Time</span><input type="range" id="tSlider" min="0" max="23.9" step="0.1" value="12"><button id="tLive" class="on">Live</button><span style="margin-left:10px">🏛️ History</span><input type="range" id="yr" min="1800" max="2026" step="1" value="2026"><span id="yrL">Now</span><button id="yPlay">▶</button></div>
 <div id="bubble" class="paper"></div><div id="hint" class="paper"></div><div id="status" class="paper"></div>
 <div id="joy"><div id="knob"></div></div><div id="updn"><button id="bUp" class="paper">⬆</button><button id="bDn" class="paper">⬇</button></div>
-<div id="attr">Map data © OpenStreetMap contributors (ODbL) · Photos & text: Wikipedia / Wikimedia Commons</div>
+<div id="attr">Map data © OpenStreetMap contributors (ODbL) · Photos & text: Wikipedia / Wikimedia Commons / Wikidata · Flights: adsb.lol / airplanes.live / OpenSky · Satellites: CelesTrak · Weather: Open-Meteo · UK incidents: data.police.uk (OGL)</div>
 <div id="start" class="over"><div class="card paper">
 <h1>🏙️ Buddy City</h1>
 <p>Pick any place on Earth and Buddy City builds it in 3D from real OpenStreetMap data: every building with its real height and roof, the streets, pavements, crossings, rivers, parks, trees, lamps, benches and bus stops. Then it brings the city to life with traffic, people, boats, day and night, and a history slider.</p>
@@ -48,7 +48,9 @@ h1{font-size:26px;margin:0 0 4px}h3{margin:12px 0 2px;font-size:17px}p{margin:4p
 </div></div>
 <div id="places" class="over" style="display:none"><div class="card paper"><h1>🔍 Where next?</h1><div class="grid" id="pre2"></div>
 <div class="row"><input type="text" id="q2" placeholder="Search anywhere on Earth…"><button id="s2">Search</button></div><div class="res" id="r2"></div><div class="row"><button id="pClose">Close</button></div></div></div>
-<div id="info" class="over" style="display:none"><div class="card paper"><h1 id="iTitle"></h1><div id="iImg"></div><div id="iBody"></div><div id="iWiki"></div><div class="row"><button id="iClose">Close</button></div></div></div>
+<div id="info" class="over" style="display:none"><div class="card paper"><h1 id="iTitle"></h1><div id="iImg"></div><div id="iBody"></div><div id="iWiki"></div><div class="row"><button id="iInside">🏢 Look inside</button><button id="iClose">Close</button></div></div></div>
+<div id="layers" class="over" style="display:none"><div class="card paper"><h1>🧭 Discovery layers</h1><p>Real data from all over the internet, placed on the map.</p><div class="grid" id="layList"></div><div class="row"><button id="lClose">Close</button></div></div></div>
+<div id="insideBar" class="paper" style="position:fixed;left:50%;top:112px;transform:translateX(-50%);display:none;gap:10px;align-items:center;padding:6px 12px;z-index:3">🏢 <input type="range" id="floor" min="1" max="5" value="5" style="width:180px"><span id="floorL"></span><button id="exitIn">Exit inside view</button></div>
 <div id="err" class="over" style="display:none"><div class="card paper"><h1>😿 Hmm…</h1><p id="errT"></p><div class="row"><button id="eClose">OK</button></div></div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -134,9 +136,9 @@ function winTex(lit){const c=document.createElement('canvas');c.width=c.height=1
  for(let i=0;i<2;i++)for(let j=0;j<2;j++){const x=i*64+18,y=j*64+14;if(lit){if(Math.random()<0.55){g.fillStyle=pickR(['#ffd98a','#ffe9b0','#ffc860','#fff2d0']);g.fillRect(x,y,28,36);}}else{g.fillStyle='#5f7486';g.fillRect(x,y,28,36);g.fillStyle='#8fa6b8';g.fillRect(x+2,y+2,10,32);g.fillStyle='#e8e2d6';g.fillRect(x-2,y+36,32,4);}}
  const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=4;return t;}
 const TEX_WIN=winTex(false),TEX_LIT=winTex(true);
-function yearMat(base){base.onBeforeCompile=sh=>{sh.uniforms.uYear=yearU;
- sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nattribute float aYear;\nvarying float vYear;').replace('#include <begin_vertex>','#include <begin_vertex>\nvYear=aYear;');
- sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nvarying float vYear;\nuniform float uYear;').replace('#include <clipping_planes_fragment>','if(vYear>uYear) discard;\n#include <clipping_planes_fragment>');};return base;}
+function yearMat(base){base.onBeforeCompile=sh=>{sh.uniforms.uYear=yearU;sh.uniforms.uHide=hideU;
+ sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nattribute float aYear;\nvarying float vYear;\nattribute float aBid;\nvarying float vBid;').replace('#include <begin_vertex>','#include <begin_vertex>\nvYear=aYear;vBid=aBid;');
+ sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nvarying float vYear;\nuniform float uYear;\nvarying float vBid;\nuniform float uHide[8];').replace('#include <clipping_planes_fragment>','if(vYear>uYear) discard;\nfor(int i=0;i<8;i++){if(abs(vBid-uHide[i])<0.5) discard;}\n#include <clipping_planes_fragment>');};return base;}
 const bMat=yearMat(new THREE.MeshLambertMaterial({side:THREE.DoubleSide,vertexColors:true,map:TEX_WIN,emissiveMap:TEX_LIT,emissive:new THREE.Color('#ffd27a'),emissiveIntensity:0}));
 const flatMat=new THREE.MeshLambertMaterial({vertexColors:true,side:THREE.DoubleSide});
 /* ---------- geometry helpers ---------- */
@@ -159,9 +161,9 @@ function parseYear(t){const s=t.start_date||t['construction:start_date']||t['bui
 function Acc(){return {p:[],n:[],c:[],uv:[],yr:[],id:[]};}
 const tmpC=new THREE.Color();
 function pushTri(A,a,b,c,col,uvs,yr,id){const ux=b[0]-a[0],uy=b[1]-a[1],uz=b[2]-a[2],vx=c[0]-a[0],vy=c[1]-a[1],vz=c[2]-a[2];let nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx;const l=Math.hypot(nx,ny,nz)||1;nx/=l;ny/=l;nz/=l;
- [a,b,c].forEach((v,i)=>{A.p.push(v[0],v[1],v[2]);A.n.push(nx,ny,nz);A.c.push(col.r,col.g,col.b);if(A.uv)A.uv.push(uvs?uvs[i*2]:0.03,uvs?uvs[i*2+1]:0.03);if(A.yr)A.yr.push(yr||0);});if(A.id)A.id.push(id);}
+ [a,b,c].forEach((v,i)=>{A.p.push(v[0],v[1],v[2]);A.n.push(nx,ny,nz);A.c.push(col.r,col.g,col.b);if(A.uv)A.uv.push(uvs?uvs[i*2]:0.03,uvs?uvs[i*2+1]:0.03);if(A.yr)A.yr.push(yr||0);if(A.bv)A.bv.push(id||0);});if(A.id)A.id.push(id);}
 function meshFrom(A,mat,withUV,withYear){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(A.p,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(A.n,3));g.setAttribute('color',new THREE.Float32BufferAttribute(A.c,3));
- if(withUV)g.setAttribute('uv',new THREE.Float32BufferAttribute(A.uv,2));if(withYear)g.setAttribute('aYear',new THREE.Float32BufferAttribute(A.yr,1));const m=new THREE.Mesh(g,mat);world.add(m);return m;}
+ if(withUV)g.setAttribute('uv',new THREE.Float32BufferAttribute(A.uv,2));if(withYear)g.setAttribute('aYear',new THREE.Float32BufferAttribute(A.yr,1));if(A.bv)g.setAttribute('aBid',new THREE.Float32BufferAttribute(A.bv,1));const m=new THREE.Mesh(g,mat);world.add(m);return m;}
 function addFlatPoly(A,outer,holes,y,col){try{const t=triangulate(outer,holes);t.tris.forEach(tr=>{const a=t.pts[tr[0]],b=t.pts[tr[1]],c=t.pts[tr[2]];const P=[[a.x,y,a.y],[c.x,y,c.y],[b.x,y,b.y]];
  const ccw=(b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x);if(ccw>0)pushTri(A,P[0],P[1],P[2],col);else pushTri(A,P[0],P[2],P[1],col);});}catch(e){}}
 /* building */
@@ -211,12 +213,12 @@ function clearCity(){for(let i=world.children.length-1;i>=0;i--){const m=world.c
 const EMO={restaurant:'🍽️',cafe:'☕',pub:'🍺',bar:'🍸',fast_food:'🍔',ice_cream:'🍦',museum:'🏛️',gallery:'🖼️',courthouse:'⚖️',townhall:'🏛️',place_of_worship:'🛐',school:'🏫',university:'🎓',college:'🎓',hospital:'🏥',clinic:'🩺',pharmacy:'💊',bank:'🏦',atm:'🏧',hotel:'🏨',hostel:'🛏️',theatre:'🎭',cinema:'🎬',library:'📚',police:'🚓',fire_station:'🚒',post_office:'📮',attraction:'⭐',viewpoint:'👀',monument:'🗿',memorial:'🕯️',castle:'🏰',supermarket:'🛒',convenience:'🏪',bakery:'🥐',clothes:'👕',books:'📖',embassy:'🏳️',arts_centre:'🎨',nightclub:'🪩',fuel:'⛽',parking:'🅿️',toilets:'🚻',information:'ℹ️',artwork:'🎨',fountain:'⛲',marketplace:'🧺',childcare:'🧸',kindergarten:'🧸',dentist:'🦷',doctors:'🩺',veterinary:'🐾',zoo:'🦁',aquarium:'🐠',stadium:'🏟️',park:'🌳',playground:'🛝',station:'🚉'};
 function poiKind(t){return t.tourism||t.amenity||t.historic||t.shop&&(EMO[t.shop]?t.shop:'shop')||t.leisure||t.office&&'office'||t.craft&&'craft'||t.building||'';}
 function poiEmoji(t){if(t.amenity==='place_of_worship')return t.religion==='muslim'?'🕌':t.religion==='christian'?'⛪':t.religion==='jewish'?'🕍':t.religion==='hindu'?'🛕':t.religion==='buddhist'?'☸️':t.religion==='sikh'?'🪯':'🛐';const k=poiKind(t);return EMO[k]||(t.shop?'🛍️':t.office?'💼':'📍');}
-async function loadCity(){clearCity();status('Finding '+(O.name||'the place')+'…');let els;
+async function loadCity(){resetLayers();clearCity();status('Finding '+(O.name||'the place')+'…');let els;
  try{els=await fetchOSM();}catch(e){status('');showErr('Could not download the city data ('+e.message+'). OpenStreetMap servers might be busy — wait a minute and try again, or pick a smaller area.');return;}
  status('Building '+els.length.toLocaleString()+' real map pieces in 3D…');await new Promise(r=>setTimeout(r,30));
  const C={buildings:[],pois:[],roads:[],foot:[],rivers:[],grid:new Map(),graph:new Map(),fgraph:new Map(),minYear:3000};CITY=C;
  const gridKey=(x,z)=>Math.floor(x/40)+'_'+Math.floor(z/40);
- const bA={p:[],n:[],c:[],uv:[],yr:[],id:[]},gA=Acc(),wA=Acc(),rA=Acc(),mA=Acc(),fA=Acc();gA.uv=gA.yr=gA.id=wA.uv=wA.yr=wA.id=rA.uv=rA.yr=rA.id=mA.uv=mA.yr=mA.id=fA.uv=fA.yr=fA.id=null;
+ const bA={p:[],n:[],c:[],uv:[],yr:[],id:[],bv:[]},gA=Acc(),wA=Acc(),rA=Acc(),mA=Acc(),fA=Acc();gA.uv=gA.yr=gA.id=wA.uv=wA.yr=wA.id=rA.uv=rA.yr=rA.id=mA.uv=mA.yr=mA.id=fA.uv=fA.yr=fA.id=null;
  const G=new THREE.Color('#8fbf63'),G2=new THREE.Color('#7aae52'),SQ=new THREE.Color('#d9d2c4'),W=new THREE.Color('#5aa0cf'),ASP=new THREE.Color('#4e5258'),ASP2=new THREE.Color('#5d6167'),PAVE=new THREE.Color('#c9c3b8'),FOOT=new THREE.Color('#d6cbb6'),RAIL=new THREE.Color('#6f6a64'),WHITE=new THREE.Color('#f4f4f0'),YEL=new THREE.Color('#e9c440'),PARK=new THREE.Color('#b0b0aa'),SAND=new THREE.Color('#e8d9a6'),WOOD=new THREE.Color('#5f9a4a');
  // ground
  const gr=new THREE.Mesh(new THREE.PlaneGeometry(O.R*6,O.R*6),new THREE.MeshLambertMaterial({color:'#c8c2b4'}));gr.rotation.x=-Math.PI/2;gr.position.y=-0.05;world.add(gr);gr.userData.ground=1;C.ground=gr;
@@ -273,7 +275,7 @@ async function loadCity(){clearCity();status('Finding '+(O.name||'the place')+'�
  C.minYear=C.minYear===3000?1800:Math.max(1000,Math.min(C.minYear,1900));$('yr').min=C.minYear;$('yr').value=2026;yearU.value=2100;$('yrL').textContent='Now';
  status('');const nb=C.buildings.filter(b=>!b.outlineOnly).length;showHint('Built '+nb.toLocaleString()+' real buildings, '+C.roads.length.toLocaleString()+' streets & paths, '+trees.length+' trees, '+C.pois.length+' places 🏙️',7);
  say(pickR(['We\'re in '+(O.name||'the city')+'! 🏙️','Everything here is real! ✨','Look at all these buildings!']),4);
- pl.x=0;pl.z=0;pl.y=0;let tries=0;while(C.buildingAt(pl.x,pl.z)&&tries++<60){pl.x+=Math.random()*20-10;pl.z+=Math.random()*20-10;}pet.x=pl.x+3;pet.z=pl.z+3;setMode('map');}
+ afterCityLoaded();pl.x=0;pl.z=0;pl.y=0;let tries=0;while(C.buildingAt(pl.x,pl.z)&&tries++<60){pl.x+=Math.random()*20-10;pl.z+=Math.random()*20-10;}pet.x=pl.x+3;pet.z=pl.z+3;setMode('map');}
 function offsetLine(pts,o){return pts.map((p,i)=>{const a=pts[Math.max(0,i-1)],b=pts[Math.min(pts.length-1,i+1)];let dx=b[0]-a[0],dz=b[1]-a[1];const l=Math.hypot(dx,dz)||1;return [p[0]-dz/l*o,p[1]+dx/l*o];});}
 /* trees & furniture (instanced) */
 const tmpM=new THREE.Matrix4(),tmpQ=new THREE.Quaternion(),tmpS=new THREE.Vector3(),tmpP=new THREE.Vector3(),UPV=new THREE.Vector3(0,1,0);
@@ -347,11 +349,12 @@ function cityHour(){return timeMode==='live'?localSolarHour():manualHour;}
 function updateSky(){const h=cityHour(),doy=Math.floor((Date.now()-Date.UTC(new Date().getUTCFullYear(),0,0))/864e5),decl=23.44*Math.sin((284+doy)/365*2*Math.PI)*Math.PI/180,lat=O.lat*Math.PI/180,ha=(h-12)*15*Math.PI/180;
  const el=Math.asin(Math.sin(lat)*Math.sin(decl)+Math.cos(lat)*Math.cos(decl)*Math.cos(ha)),az=Math.atan2(-Math.sin(ha),Math.tan(decl)*Math.cos(lat)-Math.sin(lat)*Math.cos(ha));
  const day=clamp((el*180/Math.PI+6)/14,0,1);sun.position.set(Math.sin(az)*Math.cos(el)*500,Math.max(30,Math.sin(el)*500),-Math.cos(az)*Math.cos(el)*500);sun.intensity=0.85*day+0.03;hemi.intensity=0.35+0.45*day;
- const sky=new THREE.Color('#0b1530').lerp(new THREE.Color(el<0.12&&el>-0.1?'#f0a868':'#9fc9e6'),day);scene.background=sky;scene.fog.color.copy(sky);
+ const sky=new THREE.Color('#0b1530').lerp(new THREE.Color(el<0.12&&el>-0.1?'#f0a868':'#9fc9e6'),day);if(typeof WX!=='undefined'&&WX&&LAY.weather&&(WX.cloud_cover>70||WX.weather_code>=51))sky.lerp(new THREE.Color('#8a949e'),0.45*day);scene.background=sky;scene.fog.color.copy(sky);
  const night=1-day;bMat.emissiveIntensity=night*0.95;if(LAMPS)LAMPS.material.emissive.set(night>0.4?'#f2d27a':'#000');movers.forEach(m=>{if(m.g.userData.lights)m.g.userData.lights.forEach(l=>l.visible=night>0.4);});
  const hh=Math.floor(h),mm=Math.floor((h-hh)*60);$('clock').textContent=(timeMode==='live'?'🕐 Live sun time ':'🕐 ')+String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0');}
 /* ---------- info card (real data + online pictures) ---------- */
-async function showInfo(b,poi){const t=Object.assign({},b?b.t:{},poi?poi.t:{});const pois=(b&&b.pois)||[];if(!poi&&pois.length)Object.assign(t,pois[0].t,{name:pois[0].t.name||t.name});
+let infoB=null;$('iInside').onclick=()=>enterInside(infoB);
+async function showInfo(b,poi){infoB=b;$('iInside').style.display=b?'':'none';const t=Object.assign({},b?b.t:{},poi?poi.t:{});const pois=(b&&b.pois)||[];if(!poi&&pois.length)Object.assign(t,pois[0].t,{name:pois[0].t.name||t.name});
  const name=t.name||(t['addr:housenumber']?(t['addr:housenumber']+' '+(t['addr:street']||'')):'Building');const kindTxt=(poiKind(t)||'building').replace(/_/g,' ');
  const rows=[];const add=(k,v)=>{if(v)rows.push('<div><b>'+k+'</b> '+String(v).replace(/</g,'&lt;')+'</div>');};
  add('Type',poiEmoji(t)+' '+kindTxt);add('Address',[t['addr:housenumber'],t['addr:street'],t['addr:postcode']].filter(Boolean).join(' '));if(b&&!b.outlineOnly){add('Height',Math.round(b.top)+' m');}add('Floors',t['building:levels']);
@@ -401,6 +404,7 @@ function joyMove(e){const r=joy.getBoundingClientRect();let x=(e.clientX-r.left-
 const ray=new THREE.Raycaster(),v2=new THREE.Vector2();let petTarget=null;
 function tap(sx,sy){if(!CITY)return;v2.set(sx/innerWidth*2-1,-(sy/innerHeight)*2+1);ray.setFromCamera(v2,camera);
  if(pet.root.visible&&ray.intersectObject(pet.root,true).length){pet.waveT=1.3;pet.happy=2.5;say(pickR(['Hi!! 👋','This city is amazing!','Take a photo of me here! 📸','I love exploring with you 💛',kind==='cat'?'Meow! 🐾':'Panda power! 🐼']));fxAt(sx,sy-30,'❤️');return;}
+ if(layerTap(ray))return;
  const vis=SIGNS.filter(s=>s.visible);const hs=ray.intersectObjects(vis);const hb=ray.intersectObject(CITY.bMesh);const hg=ray.intersectObjects(world.children.filter(m=>m.isMesh&&m!==CITY.bMesh&&!m.isInstancedMesh));
  if(hs.length&&(!hb.length||hs[0].distance<hb[0].distance+2)){const p=hs[0].object.userData.poi;showInfo(p.b,p);return;}
  if(hb.length){const id=CITY.bIds[hb[0].faceIndex];const b=CITY.buildings.find(q=>q.id===id);if(b){let outer=b;if(b.part){const c=centroid(b.poly.outer);outer=CITY.buildings.find(q=>q.outlineOnly&&pip(c,q.poly.outer))||b;outer.pois=(outer.pois||[]).concat(b.pois||[]);}showInfo(outer.outlineOnly?Object.assign({},outer,{top:b.top}):outer,null);}return;}
@@ -445,11 +449,172 @@ $('tSlider').oninput=e=>{timeMode='manual';manualHour=+e.target.value;$('tLive')
 $('yr').oninput=e=>{const y=+e.target.value;yearU.value=y>=2026?2100:y;$('yrL').textContent=y>=2026?'Now':y;histPlay=false;$('yPlay').textContent='▶';};
 let histPlay=false;$('yPlay').onclick=()=>{histPlay=!histPlay;$('yPlay').textContent=histPlay?'⏸':'▶';if(histPlay&&+$('yr').value>=2026)$('yr').value=$('yr').min;};
 function stepHistory(dt){if(!histPlay)return;let y=+$('yr').value+dt*25;if(y>=2026){y=2026;histPlay=false;$('yPlay').textContent='▶';}$('yr').value=y;yearU.value=y>=2026?2100:y;$('yrL').textContent=y>=2026?'Now':Math.floor(y);}
+/* =================== DISCOVERY LAYERS: live planes, airports, satellites, stories, photos, incidents, weather, interiors =================== */
+const LAY={planes:false,sats:false,stories:true,photos:true,incidents:false,weather:true,airports:false};
+const layerG=new THREE.Group();scene.add(layerG);
+function farMat(c,e){return new THREE.MeshBasicMaterial({color:c,fog:false});}
+function labelSprite(txt,emo,bg){const st=signTex(txt,emo);const s=new THREE.Sprite(new THREE.SpriteMaterial({map:st.t,depthTest:false,transparent:true,fog:false}));s.userData.tex=st;s.renderOrder=5;return s;}
+function setSpriteScale(s,k){const t=s.userData.tex;if(t)s.scale.set(t.w/t.h*k,k,1);}
+async function jget(url,opt){const r=await fetch(url,opt);if(!r.ok)throw new Error(r.status);return r.json();}
+/* ---------- live planes (ADS-B: adsb.lol / airplanes.live / OpenSky) ---------- */
+const planes=new Map();let planeT=0,planeSrc='';
+function planeModel(){const g=new THREE.Group();const m=farMat('#f4f4f0');const body=new THREE.Mesh(GC,m);body.scale.set(1.6,16,1.6);body.rotation.x=Math.PI/2;g.add(body);
+ const w=new THREE.Mesh(GB,farMat('#c9d6e2'));w.scale.set(18,0.4,3);g.add(w);const tl=new THREE.Mesh(GB,farMat('#d9534f'));tl.scale.set(0.4,3.5,2.4);tl.position.set(0,1.8,-7);g.add(tl);const ts=new THREE.Mesh(GB,farMat('#c9d6e2'));ts.scale.set(6,0.3,1.8);ts.position.set(0,0,-7);g.add(ts);
+ const blink=new THREE.Mesh(GS,new THREE.MeshBasicMaterial({color:'#ff3b30',fog:false}));blink.scale.setScalar(0.7);blink.position.set(0,-1,0);g.add(blink);g.userData.blink=blink;return g;}
+async function fetchPlanes(){const lat=O.lat.toFixed(4),lon=O.lon.toFixed(4);let ac=null;
+ for(const u of [`https://api.adsb.lol/v2/point/${lat}/${lon}/40`,`https://api.airplanes.live/v2/point/${lat}/${lon}/40`]){try{const j=await jget(u);if(j&&j.ac){ac=j.ac.map(a=>({id:a.hex,cs:(a.flight||a.r||a.hex||'').trim(),lat:a.lat,lon:a.lon,alt:(a.alt_geom||(typeof a.alt_baro==='number'?a.alt_baro:0))*0.3048,trk:a.track||0,gs:(a.gs||0)*0.514,type:a.t||'',ground:a.alt_baro==='ground'}));planeSrc=u.includes('adsb.lol')?'adsb.lol':'airplanes.live';break;}}catch(e){}}
+ if(!ac){try{const d=0.6;const j=await jget(`https://opensky-network.org/api/states/all?lamin=${O.lat-d}&lomin=${O.lon-d*1.6}&lamax=${O.lat+d}&lomax=${O.lon+d*1.6}`);ac=(j.states||[]).map(s=>({id:s[0],cs:(s[1]||s[0]).trim(),lon:s[5],lat:s[6],alt:s[13]||s[7]||0,trk:s[10]||0,gs:s[9]||0,ground:s[8]}));planeSrc='OpenSky';}catch(e){}}
+ if(!ac){showHint('✈️ Live plane data is not reachable right now (the free flight-tracking servers may be busy).',5);return;}
+ const seen=new Set();for(const a of ac){if(a.lat==null||a.lon==null||a.ground)continue;seen.add(a.id);let p=planes.get(a.id);
+  if(!p){const g=planeModel();layerG.add(g);const lab=labelSprite(a.cs+(a.type?' · '+a.type:''),'✈️');layerG.add(lab);p={g,lab};planes.set(a.id,p);}
+  const q=toL(a.lat,a.lon);Object.assign(p,{x:q[0],z:q[1],y:Math.max(60,a.alt),trk:a.trk,gs:a.gs,a,t0:performance.now()});}
+ for(const [id,p] of planes)if(!seen.has(id)){layerG.remove(p.g);layerG.remove(p.lab);planes.delete(id);}
+ if(ac.length&&!fetchPlanes.said){fetchPlanes.said=1;say('Look up! '+planes.size+' real planes in the sky right now ✈️',4.5);}}
+function updatePlanes(dt){if(!LAY.planes)return;planeT-=dt;if(planeT<=0){planeT=10;fetchPlanes();}
+ const cam=camera.position;for(const [,p] of planes){const el=(performance.now()-p.t0)/1000,r=p.trk*Math.PI/180,x=p.x+Math.sin(r)*p.gs*el,z=p.z-Math.cos(r)*p.gs*el;
+  p.g.position.set(x,p.y,z);p.g.rotation.y=Math.atan2(Math.sin(r),-Math.cos(r));const d=Math.hypot(x-cam.x,p.y-cam.y,z-cam.z),k=Math.max(3,d/260);p.g.scale.setScalar(k);
+  p.g.userData.blink.visible=(T*2%1)<0.3;p.lab.position.set(x,p.y+12*k,z);setSpriteScale(p.lab,7*k);}}
+/* ---------- airports (OpenStreetMap) ---------- */
+let airportsLoaded=false;
+async function loadAirports(){if(airportsLoaded)return;airportsLoaded=true;const q=`[out:json][timeout:25];nwr["aeroway"="aerodrome"]["iata"](around:70000,${O.lat},${O.lon});out center tags;`;
+ for(const ep of OVP){try{const j=await jget(ep,{method:'POST',body:'data='+encodeURIComponent(q),headers:{'Content-Type':'application/x-www-form-urlencoded'}});
+  (j.elements||[]).forEach(e=>{const c=e.center||e;if(c.lat==null)return;const p=toL(c.lat,c.lon),t=e.tags||{};const g=new THREE.Group();g.position.set(p[0],0,p[1]);
+   const tw=new THREE.Mesh(GC,farMat('#e8e2d6'));tw.scale.set(12,90,12);tw.position.y=45;g.add(tw);const cab=new THREE.Mesh(GC,farMat('#5b8bd6'));cab.scale.set(20,14,20);cab.position.y=97;g.add(cab);
+   const km=(Math.hypot(p[0],p[1])/1000).toFixed(0);const lab=labelSprite((t.name||'Airport')+' ('+t.iata+') · '+km+' km','🛫');lab.position.y=170;setSpriteScale(lab,60);g.add(lab);g.userData.airport=t;layerG.add(g);});
+  if(j.elements&&j.elements.length)say('There are '+j.elements.length+' airports around here 🛫',4);break;}catch(e){}}}
+/* ---------- satellites (CelesTrak + satellite.js) ---------- */
+let SATS=[],satT=0,satLoading=false;const satG=new THREE.Group();scene.add(satG);
+function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s);});}
+async function loadSats(){if(SATS.length||satLoading)return;satLoading=true;try{if(!window.satellite)await loadScript('https://cdn.jsdelivr.net/npm/satellite.js@5.0.0/dist/satellite.min.js');
+ const txt=[];for(const grp of ['stations','visual']){try{const r=await fetch('https://celestrak.org/NORAD/elements/gp.php?GROUP='+grp+'&FORMAT=tle');if(r.ok)txt.push(await r.text());}catch(e){}}
+ const lines=txt.join('\n').split(/\r?\n/).map(l=>l.trim()).filter(Boolean);const seen=new Set();
+ for(let i=0;i+2<lines.length;i++){if(lines[i+1].startsWith('1 ')&&lines[i+2].startsWith('2 ')){const name=lines[i];if(!seen.has(name)){seen.add(name);try{SATS.push({name,rec:satellite.twoline2satrec(lines[i+1],lines[i+2])});}catch(e){}}i+=2;}}
+ if(!SATS.length)throw new Error('none');say('Tracking '+SATS.length+' real satellites! 🛰️',4);}catch(e){showHint('🛰️ Satellite data could not load right now.',4);}satLoading=false;}
+function updateSats(dt){satG.visible=LAY.sats;if(!LAY.sats||!SATS.length)return;satT-=dt;if(satT>0)return;satT=1;const now=new Date(),gmst=satellite.gstime(now),obs={longitude:satellite.degreesToRadians(O.lon),latitude:satellite.degreesToRadians(O.lat),height:0.02};
+ let up=0;satG.position.copy(camera.position);
+ for(const s of SATS){let v=null;try{const pv=satellite.propagate(s.rec,now);if(pv.position){const ecf=satellite.eciToEcf(pv.position,gmst);const la=satellite.ecfToLookAngles(obs,ecf);if(la.elevation>0.09)v=la;}}catch(e){}
+  if(!v){if(s.m)s.m.visible=s.l.visible=false;continue;}up++;
+  if(!s.m){const iss=/ISS|ZARYA/.test(s.name);s.m=new THREE.Mesh(GS,new THREE.MeshBasicMaterial({color:iss?'#ffd27a':'#e8f0ff',fog:false}));s.m.scale.setScalar(iss?22:12);satG.add(s.m);
+   s.l=labelSprite(iss?'ISS — International Space Station':s.name.replace(/\s+\(.*/,''),iss?'🧑‍🚀':'🛰️');satG.add(s.l);}
+  const R=2600,el=v.elevation,az=v.azimuth,x=Math.sin(az)*Math.cos(el)*R,y=Math.sin(el)*R,z=-Math.cos(az)*Math.cos(el)*R;s.m.position.set(x,y,z);s.m.visible=true;s.l.visible=true;s.l.position.set(x,y+60,z);setSpriteScale(s.l,48);}
+ if(!updateSats.said&&up){updateSats.said=1;const iss=SATS.find(s=>/ISS|ZARYA/.test(s.name)&&s.m&&s.m.visible);say(iss?'The ISS is above us right now! 🧑‍🚀':up+' satellites are above us right now 🛰️',5);}}
+/* ---------- stories & history (Wikipedia + Wikidata) ---------- */
+let STORIES=[],storyLoaded=false;
+async function loadStories(){if(storyLoaded||!CITY)return;storyLoaded=true;const rad=Math.min(10000,Math.round(O.R*1.4));const got=new Map();
+ try{const j=await jget(`https://en.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${O.lat}|${O.lon}&gsradius=${rad}&gslimit=150&format=json&origin=*`);(j.query&&j.query.geosearch||[]).forEach(g=>got.set('w:'+g.pageid,{title:g.title,lat:g.lat,lon:g.lon,year:0,src:'wiki'}));}catch(e){}
+ try{const q=`SELECT ?item ?itemLabel ?coord (MIN(?d) AS ?date) (SAMPLE(?enwiki) AS ?wp) WHERE { SERVICE wikibase:around { ?item wdt:P625 ?coord. bd:serviceParam wikibase:center "Point(${O.lon} ${O.lat})"^^geo:wktLiteral. bd:serviceParam wikibase:radius "${(rad/1000).toFixed(2)}". } { ?item wdt:P585 ?d } UNION { ?item wdt:P571 ?d } UNION { ?item wdt:P580 ?d } OPTIONAL { ?enwiki schema:about ?item; schema:isPartOf <https://en.wikipedia.org/>. } SERVICE wikibase:label { bd:serviceParam wikibase:language "en". } } GROUP BY ?item ?itemLabel ?coord LIMIT 400`;
+  const j=await jget('https://query.wikidata.org/sparql?format=json&query='+encodeURIComponent(q));
+  (j.results&&j.results.bindings||[]).forEach(b=>{const m=b.coord.value.match(/Point\(([-\d.]+) ([-\d.]+)\)/);if(!m)return;const y=parseInt((b.date&&b.date.value||'').replace(/^-/,'-'),10);const title=b.wp?decodeURIComponent(b.wp.value.split('/wiki/')[1]).replace(/_/g,' '):b.itemLabel.value;
+   const key='t:'+title;const ex=[...got.values()].find(s=>s.title===title);if(ex){if(y)ex.year=y;ex.qid=b.item.value.split('/').pop();}else if(!/^Q\d+$/.test(title))got.set(key,{title,lat:+m[2],lon:+m[1],year:y||0,qid:b.item.value.split('/').pop(),src:'wd',wiki:!!b.wp});});}catch(e){}
+ for(const s of got.values()){const p=toL(s.lat,s.lon);if(Math.abs(p[0])>O.R*1.6||Math.abs(p[1])>O.R*1.6)continue;const b=CITY&&CITY.buildingAt(p[0],p[1]);const h=b?b.top+6:8;
+  const g=new THREE.Group();g.position.set(p[0],0,p[1]);const pole=new THREE.Mesh(GC,M('#8a6237'));pole.scale.set(0.12,h,0.12);pole.position.y=h/2;g.add(pole);
+  const gem=new THREE.Mesh(new THREE.OctahedronGeometry(1.2),new THREE.MeshLambertMaterial({color:s.year&&s.year<1900?'#b58ad8':'#f2c14e',emissive:'#403010'}));gem.position.y=h+1.5;g.add(gem);g.userData.gem=gem;
+  const lab=labelSprite((s.year?(s.year<0?Math.abs(s.year)+' BC':s.year)+' · ':'')+s.title,s.year?'📜':'📖');lab.position.y=h+4;lab.visible=false;g.add(lab);g.userData.story=s;g.userData.lab=lab;layerG.add(g);STORIES.push(g);}
+ if(STORIES.length)say('I found '+STORIES.length+' real stories and history spots here 📜',4.5);}
+let lastHistYear=0;
+function updateStories(){const cam=camera.position,yr=yearU.value;let shown=0;for(const g of STORIES){const s=g.userData.story;const vis=LAY.stories&&(!s.year||s.year<=yr);g.visible=vis;if(!vis)continue;
+ const d=Math.hypot(g.position.x-cam.x,g.position.z-cam.z);g.userData.gem.rotation.y+=0.03;const near=d<(pl.mode==='map'?Math.min(500,orbit.r*1.1):160)&&shown<60;g.userData.lab.visible=near;if(near){shown++;setSpriteScale(g.userData.lab,pl.mode==='map'?clamp(d/26,1.2,20):clamp(d/20,0.8,3));}}
+ if(histPlay){const y=Math.floor(yr);if(y!==lastHistYear){lastHistYear=y;const ev=STORIES.find(g=>g.userData.story.year===y);if(ev)say('📜 '+y+': '+ev.userData.story.title,3.5);}}}
+async function storyCard(s){$('iTitle').textContent=(s.year?'📜 ':'📖 ')+s.title;$('iBody').innerHTML=s.year?'<div><b>Date</b> '+(s.year<0?Math.abs(s.year)+' BC':s.year)+'</div>':'';$('iImg').innerHTML='<i>Loading from Wikipedia…</i>';$('iWiki').textContent='';$('iInside').style.display='none';$('info').style.display='flex';
+ try{const j=await jget('https://en.wikipedia.org/api/rest_v1/page/summary/'+encodeURIComponent(s.title.replace(/ /g,'_')));$('iImg').innerHTML=j.thumbnail?'<img src="'+((j.originalimage&&j.originalimage.source)||j.thumbnail.source)+'" alt="">':'';
+  $('iWiki').innerHTML=(j.extract||'')+(j.content_urls?' <a href="'+j.content_urls.desktop.page+'" target="_blank" rel="noopener">Read more on Wikipedia</a>':'');}catch(e){$('iImg').innerHTML='<i>Could not load the story right now.</i>';}}
+/* ---------- real photos placed where they were taken (Wikimedia Commons) ---------- */
+let PHOTOS=[],photosLoaded=false;
+async function loadPhotos(){if(photosLoaded)return;photosLoaded=true;const rad=Math.min(10000,Math.round(O.R*1.2));
+ try{const j=await jget(`https://commons.wikimedia.org/w/api.php?action=query&generator=geosearch&ggscoord=${O.lat}|${O.lon}&ggsradius=${rad}&ggslimit=60&ggsnamespace=6&prop=imageinfo|coordinates&iiprop=url|extmetadata&iiurlwidth=512&format=json&origin=*`);
+  const pages=Object.values(j.query&&j.query.pages||{});const loader=new THREE.TextureLoader();loader.setCrossOrigin('anonymous');
+  pages.forEach(pg=>{const ii=pg.imageinfo&&pg.imageinfo[0],c=pg.coordinates&&pg.coordinates[0];if(!ii||!c||!/\.(jpe?g|png)$/i.test(pg.title))return;const md=ii.extmetadata||{};const date=(md.DateTimeOriginal&&md.DateTimeOriginal.value||md.DateTime&&md.DateTime.value||'').replace(/<[^>]*>/g,'');const yr=parseInt((date.match(/\d{4}/)||[0])[0],10)||0;
+   const p=toL(c.lat,c.lon);if(CITY&&CITY.buildingAt(p[0],p[1]))return;const g=new THREE.Group();g.position.set(p[0],0,p[1]);const post=new THREE.Mesh(GC,M('#3a3f45'));post.scale.set(0.1,5,0.1);post.position.y=2.5;g.add(post);
+   const sp=new THREE.Sprite(new THREE.SpriteMaterial({color:'#ffffff'}));sp.position.y=7;sp.scale.set(6,4.5,1);g.add(sp);loader.load(ii.thumburl,t=>{sp.material.map=t;sp.material.needsUpdate=true;const a=t.image.width/t.image.height;sp.scale.set(4.5*a,4.5,1);},undefined,()=>{g.visible=false;});
+   g.userData.photo={title:pg.title.replace(/^File:/,'').replace(/\.\w+$/,''),url:ii.thumburl,page:ii.descriptionurl,date,yr,artist:(md.Artist&&md.Artist.value||'').replace(/<[^>]*>/g,'').trim(),lic:md.LicenseShortName&&md.LicenseShortName.value};g.userData.sp=sp;layerG.add(g);PHOTOS.push(g);});}catch(e){}}
+function updatePhotos(){const yr=yearU.value,cam=camera.position;for(const g of PHOTOS){const ph=g.userData.photo;g.visible=LAY.photos&&(!ph.yr||ph.yr<=yr)&&Math.hypot(g.position.x-cam.x,g.position.z-cam.z)<(pl.mode==='map'?900:300);const k=pl.mode==='map'?clamp(orbit.r/120,1,6):1;g.scale.setScalar(k);}}
+function photoCard(ph){$('iTitle').textContent='📷 '+ph.title;$('iImg').innerHTML='<img src="'+ph.url+'" alt="">';$('iBody').innerHTML=(ph.date?'<div><b>Taken</b> '+ph.date+'</div>':'')+(ph.artist?'<div><b>Photographer</b> '+ph.artist.slice(0,80).replace(/</g,'&lt;')+'</div>':'')+(ph.lic?'<div><b>Licence</b> '+ph.lic+'</div>':'');
+ $('iWiki').innerHTML='A real photo taken at this exact spot, from Wikimedia Commons. <a href="'+ph.page+'" target="_blank" rel="noopener">See it on Commons</a>';$('iInside').style.display='none';$('info').style.display='flex';}
+/* ---------- reported incidents (UK police open data) ---------- */
+let INC=[],incLoaded=false;const INC_E={'anti-social-behaviour':'📢','bicycle-theft':'🚲','burglary':'🏠','criminal-damage-arson':'🔥','drugs':'💊','other-theft':'👜','possession-of-weapons':'⚠️','public-order':'📢','robbery':'💰','shoplifting':'🛒','theft-from-the-person':'👛','vehicle-crime':'🚗','violent-crime':'⚠️','other-crime':'❗'};
+async function loadIncidents(){if(incLoaded)return;incLoaded=true;if(O.cc!=='gb'){showHint('🚓 Reported-incident data is only available for the UK (police open data).',5);return;}
+ try{const a=await jget(`https://data.police.uk/api/crimes-street/all-crime?lat=${O.lat}&lng=${O.lon}`);const by=new Map();
+  a.forEach(c=>{const k=c.location.latitude+','+c.location.longitude;if(!by.has(k))by.set(k,[]);by.get(k).push(c);});
+  for(const [k,list] of by){const [la,lo]=k.split(',').map(Number),p=toL(la,lo);const g=new THREE.Group();g.position.set(p[0],0,p[1]);const disc=new THREE.Mesh(new THREE.CylinderGeometry(1.4,1.4,0.15,16),new THREE.MeshBasicMaterial({color:'#5b8bd6',transparent:true,opacity:0.75}));disc.position.y=0.2;g.add(disc);
+   const lab=labelSprite(list.length+' report'+(list.length>1?'s':'')+' · '+list[0].month,INC_E[list[0].category]||'❗');lab.position.y=4;setSpriteScale(lab,2.4);g.add(lab);g.userData.inc=list;layerG.add(g);INC.push(g);}
+  say('These are real police reports near here from '+(a[0]?a[0].month:'last month')+' 🚓',4.5);}catch(e){showHint('🚓 Police data could not load right now.',4);}}
+function incCard(list){$('iTitle').textContent='🚓 Reported near '+(list[0].location.street&&list[0].location.street.name||'here');$('iImg').innerHTML='';const counts={};list.forEach(c=>counts[c.category]=(counts[c.category]||0)+1);
+ $('iBody').innerHTML='<div><b>Month</b> '+list[0].month+'</div>'+Object.entries(counts).map(([k,v])=>'<div><b>'+(INC_E[k]||'❗')+' '+k.replace(/-/g,' ')+'</b> '+v+'</div>').join('');
+ $('iWiki').innerHTML='From data.police.uk (open data). Locations are moved to a nearby point on purpose to protect privacy.';$('iInside').style.display='none';$('info').style.display='flex';}
+/* ---------- live weather (Open-Meteo) ---------- */
+let WX=null,wxT=0;const rainGeo=new THREE.BufferGeometry(),rainN=2500,rainArr=new Float32Array(rainN*3);for(let i=0;i<rainN;i++){rainArr[i*3]=(Math.random()-.5)*120;rainArr[i*3+1]=Math.random()*60;rainArr[i*3+2]=(Math.random()-.5)*120;}
+rainGeo.setAttribute('position',new THREE.BufferAttribute(rainArr,3));const rainMat=new THREE.PointsMaterial({color:0xaac8e8,size:0.15,transparent:true,opacity:0.8});const rain=new THREE.Points(rainGeo,rainMat);rain.frustumCulled=false;rain.visible=false;scene.add(rain);
+const WCODE=c=>c===0?['☀️','clear sky']:c<=3?['⛅','partly cloudy']:c<=48?['🌫️','foggy']:c<=57?['🌦️','drizzle']:c<=67?['🌧️','rain']:c<=77?['🌨️','snow']:c<=82?['🌧️','rain showers']:c<=86?['🌨️','snow showers']:['⛈️','thunderstorm'];
+async function loadWeather(){try{const j=await jget(`https://api.open-meteo.com/v1/forecast?latitude=${O.lat}&longitude=${O.lon}&current=temperature_2m,weather_code,wind_speed_10m,cloud_cover`);WX=j.current;const w=WCODE(WX.weather_code);
+ $('wx').textContent=w[0]+' '+Math.round(WX.temperature_2m)+'°C · '+w[1]+' · wind '+Math.round(WX.wind_speed_10m)+' km/h';say('Real weather here right now: '+w[1]+', '+Math.round(WX.temperature_2m)+'°C '+w[0],4.5);}catch(e){WX=null;$('wx').textContent='';}}
+function updateWeather(dt){wxT-=dt;if(LAY.weather&&wxT<=0){wxT=600;loadWeather();}const c=WX&&LAY.weather?WX.weather_code:0,wet=c>=51&&c<=67||c>=80&&c<=82||c>=95,snow=c>=71&&c<=77||c>=85&&c<=86;
+ rain.visible=(wet||snow)&&pl.mode!=='map';if(rain.visible){rainMat.color.set(snow?0xffffff:0xaac8e8);rainMat.size=snow?0.3:0.15;rain.position.set(camera.position.x,camera.position.y-25,camera.position.z);const sp=snow?2:20;for(let i=0;i<rainN;i++){rainArr[i*3+1]-=sp*dt;if(rainArr[i*3+1]<0)rainArr[i*3+1]+=60;}rainGeo.attributes.position.needsUpdate=true;}
+}
+/* ---------- inside buildings (OpenStreetMap indoor data, or a reconstructed interior) ---------- */
+const hideU={value:new Array(8).fill(-5)};let inside=null;
+function parseLevels(v){if(v==null)return[0];return String(v).split(/;|,/).map(s=>{const m=s.match(/-?\d+(\.\d+)?/);return m?parseFloat(m[0]):0;});}
+async function enterInside(b){if(!b||!CITY)return;$('info').style.display='none';exitInside();const ids=[];if(!b.outlineOnly&&b.id>=0)ids.push(b.id);
+ CITY.buildings.forEach(q=>{if(q.part&&ids.length<8&&pip(centroid(q.poly.outer),b.poly.outer))ids.push(q.id);});hideU.value=ids.concat(new Array(8-ids.length).fill(-5)).slice(0,8);
+ const g=new THREE.Group();world.add(g);const top=b.top||20,lv=parseFloat(b.t['building:levels'])||Math.max(1,Math.round(top*0.85/3.3)),nL=clamp(Math.round(lv),1,60),FH=Math.min(3.6,Math.max(2.8,(top*0.9)/nL));
+ inside={b,g,n:nL,FH,floors:[]};const outer=b.poly.outer;const c=centroid(outer);
+ const kindT=poiKind(Object.assign({},b.t,...(b.pois||[]).map(p=>p.t)));
+ // glass shell
+ const glass=new THREE.MeshLambertMaterial({color:'#bcd4e6',transparent:true,opacity:0.18,side:THREE.DoubleSide,depthWrite:false});
+ for(let k=0;k<nL;k++){const fg=new THREE.Group();fg.position.y=k*FH;g.add(fg);inside.floors.push(fg);const A=Acc();A.uv=A.yr=A.id=null;addFlatPoly(A,outer,b.poly.holes,0.06,new THREE.Color(k%2?'#d9c9a8':'#e6d8bc'));
+  const sl=meshFrom(A,flatMat);world.remove(sl);fg.add(sl);
+  for(let i=0;i<outer.length-1;i++){const a=outer[i],bb=outer[i+1],len=Math.hypot(bb[0]-a[0],bb[1]-a[1]);if(len<0.3)continue;const w=new THREE.Mesh(GB,glass);w.scale.set(len,FH,0.15);w.position.set((a[0]+bb[0])/2,FH/2,(a[1]+bb[1])/2);w.rotation.y=-Math.atan2(bb[1]-a[1],bb[0]-a[0]);fg.add(w);}}
+ // core: stairs + lift
+ for(let k=0;k<nL;k++){const fg=inside.floors[k];const core=new THREE.Mesh(GB,M('#9aa0a6'));core.scale.set(3,FH,3);core.position.set(c[0],FH/2,c[1]);fg.add(core);}
+ showHint('Looking inside '+(b.t.name||'this building')+'… checking OpenStreetMap indoor maps',4);
+ // OSM indoor data
+ let rooms=[];try{const bb=b.bb,ll0=toLL(bb[0],bb[3]),ll1=toLL(bb[2],bb[1]);const q=`[out:json][timeout:25][bbox:${ll0[0]},${ll0[1]},${ll1[0]},${ll1[1]}];(way["indoor"];relation["indoor"];way["room"];node["level"]["name"];);out geom;`;
+  for(const ep of OVP){try{const j=await jget(ep,{method:'POST',body:'data='+encodeURIComponent(q),headers:{'Content-Type':'application/x-www-form-urlencoded'}});rooms=j.elements||[];break;}catch(e){}}}catch(e){}
+ if(!inside||inside.b!==b)return;let usedIndoor=0;const minLv=Math.min(0,...rooms.filter(e=>e.tags&&e.tags.level!=null).map(e=>Math.min(...parseLevels(e.tags.level))));
+ for(const el of rooms){const t=el.tags||{};if(el.type==='node'){continue;}if(!t.indoor&&!t.room)continue;for(const lv0 of parseLevels(t.level)){const k=clamp(Math.round(lv0-minLv),0,nL-1);const fg=inside.floors[k];
+   for(const poly of polysOf(el)){if(!pip(centroid(poly.outer),outer))continue;usedIndoor++;const A=Acc();A.uv=A.yr=A.id=null;const col=t.indoor==='corridor'?'#efe9dc':t.indoor==='area'?'#e2ecd6':['#cfe0ec','#ecd9cf','#dcd6ec','#e6ecd0','#f0e0c0'][hashStr(String(el.id))%5];addFlatPoly(A,poly.outer,poly.holes,0.1,new THREE.Color(col));const m=meshFrom(A,flatMat);world.remove(m);fg.add(m);
+    if(t.indoor==='room'||t.room){const r=poly.outer;for(let i=0;i<r.length-1;i++){const a=r[i],bb=r[i+1],len=Math.hypot(bb[0]-a[0],bb[1]-a[1]);if(len<0.3)continue;const w=new THREE.Mesh(GB,M('#f4efe6'));w.scale.set(len,FH*0.8,0.12);w.position.set((a[0]+bb[0])/2,FH*0.4,(a[1]+bb[1])/2);w.rotation.y=-Math.atan2(bb[1]-a[1],bb[0]-a[0]);fg.add(w);}}
+    if(t.name||t.ref){const lab=labelSprite(t.name||('Room '+t.ref),t.amenity?poiEmoji(t):'🚪');const cc=centroid(poly.outer);lab.position.set(cc[0],FH*0.9,cc[1]);setSpriteScale(lab,1.4);fg.add(lab);}}}}
+ if(!usedIndoor)reconstructInterior(b,kindT,FH,nL);
+ // shops/POIs on their level
+ (b.pois||[]).forEach(p=>{const lv=p.t.level!=null?parseLevels(p.t.level)[0]:0;const k=clamp(Math.round(lv-minLv),0,nL-1);const lab=labelSprite(p.t.name,poiEmoji(p.t));lab.position.set(p.p[0],FH*0.95,p.p[1]);setSpriteScale(lab,1.6);inside.floors[k].add(lab);});
+ $('insideBar').style.display='flex';$('floor').max=nL;$('floor').value=nL;$('floorL').textContent='All '+nL+' floors';
+ setMode('map');orbit.tx=c[0];orbit.tz=c[1];orbit.r=Math.max(40,Math.sqrt(Math.abs(area(outer)))*2.2);orbit.phi=0.9;
+ say(usedIndoor?'Real indoor map from OpenStreetMap! 🗺️':'Here\'s how it might look inside 🏢',4);showHint(usedIndoor?'🏢 Real indoor rooms from OpenStreetMap · use the floor slider':'🏢 No public indoor map for this building, so this inside is reconstructed from its type, size and floors · use the floor slider',7);}
+function reconstructInterior(b,kindT,FH,nL){const outer=b.poly.outer,bb=b.bb,step=kindT==='museum'?9:kindT==='courthouse'?8:6;
+ for(let k=0;k<nL;k++){const fg=inside.floors[k],A=Acc();A.uv=A.yr=A.id=null;const wallC=new THREE.Color('#f4efe6');
+  for(let x=bb[0]+step;x<bb[2];x+=step)for(let z=bb[1];z<bb[3];z+=step){const mid=[x,z+step/2];if(!pip(mid,outer)||Math.random()<0.3)continue;const w=new THREE.Mesh(GB,M('#f4efe6'));w.scale.set(0.15,FH*0.85,step*0.75);w.position.set(x,FH*0.42,z+step/2);fg.add(w);}
+  for(let z=bb[1]+step;z<bb[3];z+=step)for(let x=bb[0];x<bb[2];x+=step){const mid=[x+step/2,z];if(!pip(mid,outer)||Math.random()<0.3)continue;const w=new THREE.Mesh(GB,M('#f4efe6'));w.scale.set(step*0.75,FH*0.85,0.15);w.position.set(x+step/2,FH*0.42,z);fg.add(w);}
+  for(let x=bb[0]+step/2;x<bb[2];x+=step)for(let z=bb[1]+step/2;z<bb[3];z+=step){if(!pip([x,z],outer))continue;furnish(fg,x,z,kindT,k,FH);}}}
+function furnish(fg,x,z,kindT,k,FH){const r=Math.random();const add=(w,h,d,c,dx,dz,y)=>{const m=new THREE.Mesh(GB,M(c));m.scale.set(w,h,d);m.position.set(x+dx,(y||0)+h/2,z+dz);fg.add(m);};
+ if(kindT==='museum'||kindT==='gallery'){add(1,1,1,'#e8e2d6',0,0);const s=new THREE.Mesh(r<0.5?new THREE.IcosahedronGeometry(0.4,0):new THREE.TorusKnotGeometry(0.25,0.08,24,6),M(pickR(['#d9b45a','#b8a27a','#7fb8a8','#c9734a'])));s.position.set(x,1.45,z);fg.add(s);add(2.2,1.4,0.08,pickR(['#c9734a','#5b8bd6','#6fae5a']),0,-2.4,1);}
+ else if(kindT==='courthouse'){add(3,1,1,'#6b4a2b',0,-1.5);add(0.8,0.5,0.8,'#8a6237',0,-2.8,1);for(let i=-1;i<=1;i++)add(2.6,0.45,0.6,'#8a6237',0,i*1.2+0.8);}
+ else if(/restaurant|cafe|pub|bar|fast_food/.test(kindT)&&k===0){for(let i=-1;i<=1;i+=2){add(1,0.05,1,'#fbfbfb',i*1.3,0,0.75);add(0.1,0.75,0.1,'#6b4a2b',i*1.3,0);[[-0.7,0],[0.7,0]].forEach(q=>add(0.45,0.45,0.45,'#c9734a',i*1.3+q[0],q[1]));}}
+ else if(/shop|supermarket|convenience|clothes|books/.test(kindT)&&k===0){for(let i=-1;i<=1;i++)add(0.6,1.8,3,pickR(['#f2c14e','#d9534f','#5b8bd6','#6fae5a']),i*1.6,0);}
+ else if(/apartments|house|residential|detached|terrace/.test(kindT)){if(r<0.4){add(2,0.5,1.4,'#fbf7ee',0,0);add(2,0.2,1.4,'#7aa6d8',0,0,0.5);}else if(r<0.75){add(2,0.45,0.9,'#e08a5a',0,0);add(1.2,0.4,0.6,'#8a5a3a',0,1.2);}else add(1.4,0.75,0.8,'#b8875a',0,0);}
+ else{if(r<0.7){add(1.6,0.05,0.8,'#e8e2d6',0,0,0.75);add(0.08,0.75,0.08,'#555',0,0);add(0.5,0.35,0.05,'#222',0,-0.2,0.8);add(0.5,0.5,0.5,'#3a3f45',0,0.6);}else add(0.8,1.6,0.4,'#9aa0a6',0,0);}}
+function exitInside(){if(!inside)return;world.remove(inside.g);inside.g.traverse(o=>{if(o.geometry&&o.geometry!==GB&&o.geometry!==GC&&o.geometry!==GS)o.geometry.dispose();});inside=null;hideU.value=new Array(8).fill(-5);$('insideBar').style.display='none';}
+$('floor').oninput=e=>{if(!inside)return;const n=+e.target.value;inside.floors.forEach((f,i)=>f.visible=i<n);$('floorL').textContent=n>=inside.n?'All '+inside.n+' floors':'Up to floor '+(n-1);};
+$('exitIn').onclick=exitInside;
+/* ---------- layers panel ---------- */
+function layerUI(){const box=$('layList');box.innerHTML='';[['stories','📜 Stories & history','Wikipedia + Wikidata: real events and places with dates, shown on the history slider'],['photos','📷 Real photos on the spot','Wikimedia Commons photos placed where they were taken'],['planes','✈️ Live planes','Real aircraft overhead right now (ADS-B flight tracking)'],['airports','🛫 Airports nearby','Airports within 70 km, from OpenStreetMap'],['sats','🛰️ Satellites overhead','Real satellites and the ISS above this city right now'],['weather','🌦️ Live weather','Real current weather here (Open-Meteo)'],['incidents','🚓 Reported incidents (UK)','Police open data for the latest month (locations are approximate)']].forEach(r=>{
+ const b=document.createElement('button');b.className=LAY[r[0]]?'on':'';b.innerHTML=r[1]+'<br><small>'+r[2]+'</small>';b.style.textAlign='left';b.onclick=()=>{LAY[r[0]]=!LAY[r[0]];b.className=LAY[r[0]]?'on':'';applyLayer(r[0]);};box.appendChild(b);});}
+function applyLayer(k){if(k==='planes'){planes.forEach(p=>{p.g.visible=p.lab.visible=LAY.planes;});if(LAY.planes){planeT=0;camera.far=Math.max(camera.far,90000);camera.updateProjectionMatrix();}}
+ if(k==='sats'&&LAY.sats){loadSats();camera.far=Math.max(camera.far,9000);camera.updateProjectionMatrix();}if(k==='stories'&&LAY.stories)loadStories();if(k==='photos'&&LAY.photos)loadPhotos();if(k==='incidents'){INC.forEach(g=>g.visible=LAY.incidents);if(LAY.incidents)loadIncidents();}
+ if(k==='airports'){layerG.children.forEach(c=>{if(c.userData.airport)c.visible=LAY.airports;});if(LAY.airports){loadAirports();camera.far=Math.max(camera.far,90000);camera.updateProjectionMatrix();}}if(k==='weather'){wxT=LAY.weather?0:1e9;if(!LAY.weather){$('wx').textContent='';rain.visible=false;}}}
+$('bLayers').onclick=()=>{layerUI();$('layers').style.display='flex';};$('lClose').onclick=()=>{$('layers').style.display='none';};
+function resetLayers(){exitInside();planes.forEach(p=>{layerG.remove(p.g);layerG.remove(p.lab);});planes.clear();for(let i=layerG.children.length-1;i>=0;i--)layerG.remove(layerG.children[i]);STORIES=[];PHOTOS=[];INC=[];storyLoaded=photosLoaded=incLoaded=airportsLoaded=false;fetchPlanes.said=0;updateSats.said=0;wxT=0;$('wx').textContent='';}
+function afterCityLoaded(){Object.keys(LAY).forEach(k=>{if(LAY[k])applyLayer(k);});}
+function layerTap(ray){const hits=ray.intersectObjects(layerG.children,true);if(!hits.length)return false;let o=hits[0].object;while(o&&!o.userData.story&&!o.userData.photo&&!o.userData.inc&&!o.userData.airport&&o.parent!==layerG)o=o.parent;
+ if(o&&o.userData.story){storyCard(o.userData.story);return true;}if(o&&o.userData.photo){photoCard(o.userData.photo);return true;}if(o&&o.userData.inc){incCard(o.userData.inc);return true;}
+ for(const [,p] of planes){if(hits[0].object===p.lab||p.g.children.includes(hits[0].object)){const a=p.a;$('iTitle').textContent='✈️ '+(a.cs||'Aircraft');$('iImg').innerHTML='';$('iBody').innerHTML='<div><b>Altitude</b> '+Math.round(a.alt)+' m ('+Math.round(a.alt/0.3048)+' ft)</div><div><b>Speed</b> '+Math.round(a.gs*3.6)+' km/h</div><div><b>Heading</b> '+Math.round(a.trk)+'°</div>'+(a.type?'<div><b>Aircraft type</b> '+a.type+'</div>':'')+'<div><b>Data</b> '+planeSrc+' (live)</div>';$('iWiki').innerHTML=a.cs?'<a href="https://globe.adsb.lol/?icao='+a.id+'" target="_blank" rel="noopener">Follow this flight live</a>':'';$('iInside').style.display='none';$('info').style.display='flex';return true;}}
+ return false;}
+function updateLayers(dt){updatePlanes(dt);updateSats(dt);updateStories();updatePhotos();updateWeather(dt);}
+
 /* ---------- loop ---------- */
 let T=0,last=0,slowT=0;const tmpV=new THREE.Vector3(),bub=$('bubble');
 function frame(now){requestAnimationFrame(frame);if(!last)last=now;const dt=Math.min(0.1,(now-last)/1000);last=now;T+=dt;
  if(hintT>0){hintT-=dt;if(hintT<=0)$('hint').style.display='none';}
- updatePlayer(dt);updateCam();if(CITY){stepMovers(dt);updateBuddy(dt);stepHistory(dt);}
+ updatePlayer(dt);updateCam();if(CITY){stepMovers(dt);updateBuddy(dt);stepHistory(dt);updateLayers(dt);}
  slowT-=dt;if(slowT<=0){slowT=0.5;updateSky();updateSigns();if(CITY){const ll=toLL(pl.mode==='map'?orbit.tx:pl.x,pl.mode==='map'?orbit.tz:pl.z);$('coords').textContent=ll[0].toFixed(5)+', '+ll[1].toFixed(5);}}
  renderer.render(scene,camera);}
 buildPet();updateSky();requestAnimationFrame(frame);
