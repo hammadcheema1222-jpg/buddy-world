@@ -43,6 +43,29 @@ input,select{min-height:44px;border-radius:10px;border:1px solid var(--line);bac
 .hero button{background:transparent;color:#fff;border-color:rgba(255,255,255,.35)}
 .hero button.main{background:#fff;color:var(--hero);border-color:#fff}
 .hero.calm{background:var(--panel);color:var(--ink)}.hero.calm button{color:var(--ink);border-color:var(--line)}
+.where{position:relative;overflow:hidden;border-radius:26px;padding:20px 18px 18px;margin-bottom:14px;color:#fff;background:radial-gradient(120% 90% at 100% 0%,#c8102e 0%,transparent 55%),radial-gradient(90% 90% at 0% 100%,#0098d4 0%,transparent 60%),linear-gradient(135deg,#2a1d5e,#6950a1)}
+.where::after{content:"";position:absolute;left:-40%;right:-40%;bottom:18px;height:3px;background:repeating-linear-gradient(90deg,rgba(255,255,255,.35) 0 22px,transparent 22px 34px);animation:rails 2.4s linear infinite;pointer-events:none}
+@keyframes rails{to{transform:translateX(34px)}}
+@media(prefers-reduced-motion:reduce){.where::after{animation:none}}
+.where .hi{margin:0;font-weight:700;opacity:.85}
+.where h1{margin:2px 0 12px;font-size:clamp(34px,9vw,52px);line-height:1;letter-spacing:-.03em}
+.sbox{display:flex;align-items:center;gap:8px;background:#fff;color:#14162b;border-radius:16px;padding:4px 6px 4px 14px;box-shadow:0 10px 30px rgba(10,8,40,.35)}
+.sbox input{border:0;background:transparent;min-height:50px;font-size:17px;padding:0;color:#14162b}.sbox input:focus{outline:none}
+.sbox button{border:0;background:#f0eef7;color:#6950a1;min-height:42px;border-radius:12px;padding:0 12px}
+.wchips{display:flex;gap:6px;overflow-x:auto;margin-top:10px;padding-bottom:6px}
+.wchips button{flex:0 0 auto;background:rgba(255,255,255,.16);color:#fff;border-color:rgba(255,255,255,.28);min-height:38px;border-radius:99px;font-size:14px}
+.sugg{background:#fff;color:#14162b;border-radius:14px;margin-top:6px;overflow:hidden}.sugg button{display:block;width:100%;text-align:left;border:0;border-radius:0;border-bottom:1px solid #eceef4;background:#fff;color:#14162b;font-weight:600}.sugg small{color:#5d6275;font-weight:400}
+.plan{margin-top:12px;background:var(--bg);color:var(--ink);border-radius:18px;padding:14px}
+.plan h3{margin:0 0 2px;font-size:18px}
+.rr{display:grid;grid-template-columns:62px minmax(0,1fr) 58px;gap:8px;align-items:center;margin:8px 0}
+.rr .rb{height:30px;border-radius:9px;background:var(--panel);position:relative;overflow:hidden}.rr .rb i{position:absolute;left:0;top:0;bottom:0;border-radius:9px;display:flex;align-items:center;padding:0 8px;color:#fff;font-size:12px;font-weight:800;white-space:nowrap;min-width:max-content;animation:grow .9s cubic-bezier(.2,.8,.2,1) both}
+@keyframes grow{from{width:0!important}}
+.rr b{text-align:right;font-size:17px}.rr .md{display:flex;align-items:center;gap:4px;font-weight:700;font-size:14px}.rr .md svg{width:18px;height:18px}
+.rr.best .rb{outline:2px solid var(--go);outline-offset:2px}
+.legs{display:flex;height:10px;border-radius:5px;overflow:hidden;gap:2px;margin:8px 0}.legs span{display:block;height:100%}
+.opt{border-top:1px solid var(--line);padding:10px 0 2px}
+.opt .row3{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
+.opt .go{background:#6950a1;color:#fff;border-color:#6950a1;min-height:44px}
 .coach{margin-top:12px;border-radius:22px;padding:16px;color:#fff;background:#14162b;transition:background .4s}
 .coach.ok{background:#0c5e40}.coach.tight{background:#7a5410}.coach.behind{background:#8f1d2c}.coach.gone{background:#3b3f5c}
 .coach .say{font-size:clamp(26px,7vw,36px);font-weight:800;line-height:1.05;margin:4px 0 10px;letter-spacing:-.01em}
@@ -186,6 +209,14 @@ details summary{cursor:pointer;font-weight:600;margin:10px 0}
   <button id="setBtn">Setup</button>
 </div>
 <main class="wrap">
+  <section class="where" id="where">
+    <p class="hi" id="hi">Hello</p>
+    <h1>Where to?</h1>
+    <div class="sbox"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6950a1" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input id="wq" type="search" placeholder="Uni, a station, a postcode, anywhere" autocomplete="off" aria-label="Where to?"><button id="wMe" title="Start from where I am now">From here</button></div>
+    <div id="wSugg"></div>
+    <div class="wchips" id="wChips"></div>
+    <div id="wRes"></div>
+  </section>
   <section id="hero" class="call calm" aria-live="polite"></section>
   <div id="tripBox"></div>
   <div id="modesBox"><p class="lbl">How you can get there today</p><div class="modes" id="modes"></div></div>
@@ -371,7 +402,8 @@ function makeDemo() {
   lastOk = now; lastErr = ''; render();
 }
 let demoPlaces = [], demoSeed = [];
-const placeOf = id => cfg.places.find(p => p.id === id) || demoPlaces.find(p => p.id === id);
+const placeOf = id => id === 'jp' ? jpPlace : cfg.places.find(p => p.id === id) || demoPlaces.find(p => p.id === id);
+let jpPlace = null;
 
 /* ---------- best option ---------- */
 function best(now) {
@@ -557,6 +589,89 @@ function endTrip() {
   }
   coachStop(); trip = null; drawTrip(); render();
 }
+
+/* ---------- Where to? Journeys other apps hide ----------
+   Map apps plan as if you walk to the first stop. We ask TfL's Journey Planner for journeys that
+   started up to 15 minutes ago too, then re-time the first walk at your own run / bike / lift speed.
+   A journey counts as catchable when Φ(slack / σ) ≥ 80%, slack = first departure − now − your travel − buffer. */
+const WQ = {here: null, to: null, res: null, timer: null};
+const greet = () => { const h = new Date().getHours(); return h < 5 ? 'Late one' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'; };
+const LEGCOL = {walking: '#b8bccb', bus: '#c8102e', 'elizabeth-line': '#6950a1', tube: '#0019a8', dlr: '#00a4a7', overground: '#ee7c0e', 'national-rail': '#d70428', tram: '#5fb526', 'cable-car': '#e21836', coach: '#8a6d3b', 'river-bus': '#0098d4', cycle: '#0f9d8a'};
+const legCol = l => LINE_COL[l.routeOptions?.[0]?.lineIdentifier?.id] || LEGCOL[l.mode?.id] || '#3b3f5c';
+function origin() { return WQ.here || (cfg.home ? {lat: cfg.home[1], lon: cfg.home[0], name: 'home'} : null); }
+function drawChips() {
+  const ds = cfg.dests || [];
+  $('#wChips').innerHTML = ds.map((d, i) => `<button data-d="${i}">★ ${esc(d.name)}</button>`).join('');
+  $('#wChips').querySelectorAll('button').forEach(b => b.addEventListener('click', () => planTo(ds[+b.dataset.d])));
+}
+async function suggest(q) {
+  q = q.trim(); if (q.length < 3) { $('#wSugg').innerHTML = ''; return; }
+  const o = origin() || {lat: 51.51, lon: -0.12};
+  try {
+    const pc = /^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i.test(q) ? await getJSON('https://api.postcodes.io/postcodes/' + encodeURIComponent(q)).then(r => [{name: r.result.postcode, sub: r.result.admin_district, lat: r.result.latitude, lon: r.result.longitude}]).catch(() => []) : [];
+    const r = await getJSON(`https://photon.komoot.io/api/?limit=5&lang=en&lat=${o.lat}&lon=${o.lon}&q=${encodeURIComponent(q)}`);
+    const list = pc.concat((r.features || []).map(f => ({name: f.properties.name || q, sub: [f.properties.street, f.properties.city || f.properties.county].filter(Boolean).join(', '), lat: f.geometry.coordinates[1], lon: f.geometry.coordinates[0]})));
+    { const s = new Set(); for (let i = list.length - 1; i >= 0; i--) { const k = list[i].name + '|' + list[i].sub; if (s.has(k)) list.splice(i, 1); else s.add(k); } }
+    $('#wSugg').innerHTML = list.length ? `<div class="sugg">${list.map((s, i) => `<button data-s="${i}">${esc(s.name)} <small>${esc(s.sub || '')}</small></button>`).join('')}</div>` : '';
+    $('#wSugg').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { const s = list[+b.dataset.s]; $('#wSugg').innerHTML = ''; $('#wq').value = s.name; planTo(s); }));
+  } catch (e) { $('#wSugg').innerHTML = ''; }
+}
+const jpTime = ms => { const d = new Date(ms); return {date: d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0'), time: String(d.getHours()).padStart(2, '0') + String(d.getMinutes()).padStart(2, '0')}; };
+async function planTo(dest) {
+  WQ.to = dest; const o = origin();
+  if (!o) { $('#wRes').innerHTML = '<div class="plan"><b>Where are you starting from?</b><p class="note">Tap "From here", or add your home in Setup.</p></div>'; return; }
+  cfg.dests = [dest, ...(cfg.dests || []).filter(d => d.name !== dest.name)].slice(0, 6); save(); drawChips();
+  $('#wRes').innerHTML = '<div class="plan"><p class="note" style="margin:0">Finding every train and bus you could still catch…</p></div>';
+  const now = Date.now(), qs = [now - 15 * 60000, now + 6 * 60000].map(ms => { const j = jpTime(ms); return getJSON(`${TFL}/Journey/JourneyResults/${o.lat.toFixed(5)},${o.lon.toFixed(5)}/to/${dest.lat.toFixed(5)},${dest.lon.toFixed(5)}?date=${j.date}&time=${j.time}&timeIs=Departing&journeyPreference=leasttime`).catch(() => null); });
+  const out = (await Promise.all(qs)).filter(Boolean), seen = new Set(), js = [];
+  for (const r of out) for (const j of r.journeys || []) { const k = j.legs.map(l => l.departureTime + l.mode.id).join('|'); if (!seen.has(k)) { seen.add(k); js.push(j); } }
+  if (!js.length) { $('#wRes').innerHTML = `<div class="plan"><b>No journeys found</b><p class="note">TfL's planner covers London and the South East. Try a nearer place or a station name.</p></div>`; return; }
+  WQ.res = js.map(j => {
+    const legs = j.legs, first = legs.findIndex(l => l.mode.id !== 'walking'), w = first > 0 ? legs.slice(0, first).reduce((s, l) => s + l.duration, 0) : 0;
+    const tl = first >= 0 ? legs[first] : null;
+    return {j, legs, w, tl, dep: tl ? new Date(tl.departureTime).getTime() : null, arr: new Date(j.arrivalDateTime).getTime(), start: new Date(j.startDateTime).getTime()};
+  }).sort((a, b) => a.arr - b.arr);
+  drawPlan();
+}
+function modeTravel(k, w) { const F = cfg.f; return k === 'walk' ? w : k === 'run' ? w * F.run : k === 'bike' ? w * F.bike : cfg.liftPickup + w * F.drive; }
+function catchable(r, k, now) {
+  if (!r.tl) return {ok: r.start >= now - 60000, pr: 1, leave: (r.start - now) / 1000};
+  const T = modeTravel(k, r.w) * 60, sm = 0.12 * T + 20, sl = (r.dep - now) / 1000 - T - cfg.buffer;
+  return {ok: Phi(sl / Math.sqrt(60 * 60 + sm * sm)) >= cfg.want, pr: Phi(sl / Math.sqrt(3600 + sm * sm)), leave: sl - 0.8416 * Math.sqrt(3600 + sm * sm)};
+}
+function drawPlan() {
+  const now = Date.now(), R = WQ.res; if (!R) return;
+  const ms = MODES.filter(m => m.k === 'walk' || (m.k === 'lift' ? cfg.liftOn : cfg.today?.[m.k] !== false));
+  const pick = ms.map(m => { const r = R.find(x => catchable(x, m.k, now).ok); return r ? {m, r, c: catchable(r, m.k, now)} : null; }).filter(Boolean);
+  if (!pick.length) { $('#wRes').innerHTML = '<div class="plan"><b>Nothing catchable right now</b></div>'; return; }
+  const wk = pick.find(p => p.m.k === 'walk'); if (wk) for (let i = pick.length - 1; i >= 0; i--) if (pick[i].r.arr > wk.r.arr) pick.splice(i, 1);   // drop modes that are slower than just walking
+  const walk = pick.find(p => p.m.k === 'walk'), bestP = pick.reduce((a, b) => b.r.arr < a.r.arr ? b : a), span = Math.max(...pick.map(p => p.r.arr)) - now;
+  const gain = walk && bestP.m.k !== "walk" ? Math.round((walk.r.arr - bestP.r.arr) / 60000) : 0;
+  const headline = gain >= 3 ? `${bestP.m.label} and you're there <b>${gain} min sooner</b>` : `Arrive <b>${hhmm(bestP.r.arr)}</b>` + (pick.length > 1 ? ' <span class="note">· running wouldn\'t catch anything faster</span>' : '');
+  const legsBar = r => `<div class="legs">${r.legs.map(l => `<span style="flex:${Math.max(1, l.duration)};background:${legCol(l)}" title="${esc(l.instruction.summary)}"></span>`).join('')}</div>`;
+  const opts = [...new Map(pick.map(p => [p.r, p])).values()].sort((a, b) => a.r.arr - b.r.arr);
+  $('#wRes').innerHTML = `<div class="plan">
+    <h3>To ${esc(WQ.to.name)}</h3><p class="note" style="margin:0 0 6px">from ${esc(origin().name || 'here')} · leaving now</p>
+    <p style="margin:6px 0 4px;font-size:18px">${headline}</p>
+    ${opts.map(p => { const g = pick.filter(q => q.r === p.r); return `<div class="rr ${p.r === bestP.r ? 'best' : ''}"><span class="md">${g.map(q => `<span style="color:${q.m.col}" title="${q.m.label}">${svgI(q.m.k)}</span>`).join('')}</span><div class="rb"><i style="width:${Math.max(8, (p.r.arr - now) / span * 100)}%;background:${g[0].m.col}">${p.r.tl ? esc((p.r.tl.routeOptions?.[0]?.name || p.r.tl.mode.name) + ' ' + hhmm(p.r.dep)) : 'all the way'}</i></div><b>${hhmm(p.r.arr)}</b></div>`; }).join('')}
+    ${opts.map(p => { const c = p.c, others = pick.filter(q => q.r === p.r).map(q => q.m.label).join(' / '); return `<div class="opt"><div class="row3"><span><b>${p.r.tl ? esc(p.r.tl.routeOptions?.[0]?.name || p.r.tl.mode.name) : 'Walk'}</b> ${p.r.tl ? 'from ' + esc(p.r.tl.departurePoint.commonName) + ' at ' + hhmm(p.r.dep) : ''}</span><span class="note">arrive ${hhmm(p.r.arr)}</span></div>
+      ${legsBar(p.r)}<div class="row3"><span class="g" style="font-weight:700" data-lv="${p.r.dep || p.r.start}" data-k="${p.m.k}" data-w="${p.r.w}">${others}: leave ${c.leave > 30 ? 'in ' + mmss(c.leave) : 'now'}</span><button class="go" data-o="${R.indexOf(p.r)}" data-m="${p.m.k}">Go</button></div></div>`; }).join('')}
+    <p class="note" style="margin:10px 0 0">Journey data: TfL Journey Planner. Run, bike and lift timings are yours, learned on the Board.</p></div>`;
+  $('#wRes').querySelectorAll('.go').forEach(b => b.addEventListener('click', () => goJourney(R[+b.dataset.o], b.dataset.m)));
+}
+function goJourney(r, k) {
+  const tl = r.tl, dp = tl ? tl.departurePoint : null;
+  jpPlace = {id: 'jp', name: dp ? dp.commonName : WQ.to.name, lat: dp?.lat ?? WQ.to.lat, lon: dp?.lon ?? WQ.to.lon, walk: r.w || 1, platform: 0};
+  const name = tl?.routeOptions?.[0]?.name || '', lid = /greater anglia/i.test(name) ? 'LE' : /elizabeth/i.test(name) ? 'XR' : tl?.routeOptions?.[0]?.lineIdentifier?.id || '';
+  const d = tl ? {key: 'jp|' + tl.departureTime + name, t: r.dep, mode: tl.mode.id === 'bus' ? 'bus' : 'rail', line: name || tl.mode.name, lineId: lid, dest: tl.arrivalPoint.commonName, colour: legCol(tl), std: hhmm(r.dep), calls: []} : null;
+  startTrip(jpPlace, k, d);
+}
+setInterval(() => { if (!WQ.res) return; const now = Date.now(); document.querySelectorAll('[data-lv]').forEach(el => { const r = WQ.res.find(x => String(x.dep || x.start) === el.dataset.lv); if (!r) return; const c = catchable(r, el.dataset.k, now); el.textContent = el.textContent.replace(/leave .*$/, c.leave > 30 ? 'leave in ' + mmss(c.leave) : c.ok ? 'leave now' : 'too late'); }); }, 1000);
+setInterval(() => { if (WQ.to && document.visibilityState === 'visible') planTo(WQ.to); }, 120000);
+$('#hi').textContent = greet();
+let wqT; $('#wq').addEventListener('input', e => { clearTimeout(wqT); wqT = setTimeout(() => suggest(e.target.value), 380); });
+$('#wMe').addEventListener('click', () => navigator.geolocation?.getCurrentPosition(g => { WQ.here = {lat: g.coords.latitude, lon: g.coords.longitude, name: 'here'}; $('#wMe').textContent = 'From here ✓'; if (WQ.to) planTo(WQ.to); }, () => { $('#wMe').textContent = 'No location'; }, {enableHighAccuracy: true, timeout: 10000}));
+drawChips();
 
 /* ---------- live run coach: GPS pace vs the departure, spoken and buzzed ----------
    remaining route ≈ straight-line distance × 1.3 (typical street detour factor)
