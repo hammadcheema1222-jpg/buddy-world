@@ -143,3 +143,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{ou
 .plan svg{background:var(--paper)}
 
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+/* maps inside the Board */
+.zone{margin-top:10px;background:var(--paper);border:1.5px solid var(--rule);border-radius:var(--r-lg);overflow:hidden}
+#zmap{height:240px}
+.zcap{margin:0;padding:10px 14px 12px;font-size:15px;color:var(--ink)}
+.rmap{height:220px;border-radius:var(--r-md);overflow:hidden;margin:10px 0 6px;border:1.5px solid var(--rule)}
+.maplibregl-ctrl-attrib{font-size:10px}
+.mcred{margin:0;padding:0 14px 10px;font-size:11px;color:var(--soft)}
+.maplibregl-canvas:focus-visible{outline:3px solid var(--edge)}

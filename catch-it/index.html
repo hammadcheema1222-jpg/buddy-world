@@ -220,6 +220,7 @@ details summary{cursor:pointer;font-weight:600;margin:10px 0}
     <div id="wRes"></div>
   </section>
   <section id="hero" class="call calm" aria-live="polite"></section>
+  <div class="zone" id="zone" hidden><div id="zmap" role="img" aria-label="Catch zone map: how far from the station you could be and still make this departure"></div><p class="zcap" id="zcap"></p><p class="mcred">Map © OpenFreeMap, © OpenStreetMap contributors</p></div>
   <div id="tripBox"></div>
   <div id="modesBox"><p class="lbl">How you can get there today</p><div class="modes" id="modes"></div></div>
   <p class="lbl" id="boardLbl">Everything you can catch</p>
@@ -393,7 +394,7 @@ async function weather() {
 function makeDemo() {
   const now = Date.now();
   if (!cfg.places.some(p => p.id === 'demo1')) {
-    demoPlaces = [{id:'demo1', name:'Demo station', walk:9, platform:2, lat:51.5748, lon:0.1832, modes:{walk:true,run:true,bike:true,lift:true}}, {id:'demo2', name:'Demo bus stop', walk:3, platform:0.5, modes:{walk:true,run:true,bike:false,lift:false}}];
+    demoPlaces = [{id:'demo1', name:'Demo station', walk:9, platform:2, lat:51.5748, lon:0.1832, modes:{walk:true,run:true,bike:true,lift:true}}, {id:'demo2', name:'Demo bus stop', walk:3, platform:0.5, lat:51.5741, lon:0.1801, modes:{walk:true,run:true,bike:false,lift:false}}];
   }
   if (!demoSeed.length) {
     const base = [[4,'Elizabeth','elizabeth','Heathrow Terminal 5','Platform 4',1],[11,'Elizabeth','elizabeth','Abbey Wood','Platform 4',1],[13,'Greater Anglia','LE','London Liverpool Street','Platform 2',1],[2,'103','bus','Rainham Station','Stop E',2],[7,'175','bus','Dagenham, Ford Works','Stop E',2],[16,'Elizabeth','elizabeth','Heathrow Terminal 5','Platform 4',1],[19,'103','bus','Rainham Station','Stop E',2],[24,'Greater Anglia','LE','London Liverpool Street','Platform 2',1]];
@@ -486,6 +487,7 @@ function drawModes() {
 }
 function heroDraw(now) {
   const h = $('#hero'), b = best(now);
+  zoneDraw(b);
   if (!b) { h.className = 'call calm'; h.dataset.key = ''; h.innerHTML = `<div class="big"><b style="font-size:34px">${demo ? 'Demo mode' : 'Nothing to catch yet'}</b></div><p class="raceTxt">${demo ? 'Sample departures, not live data.' : cfg.places.length ? 'Waiting for live departures…' : 'Add your stops in Setup to see live departures.'}</p><div class="acts" style="margin-top:10px">${demo ? '<button id="exitDemo">Exit demo</button>' : ''}</div>`; $('#exitDemo')?.addEventListener('click', exitDemo); return; }
   const ok = b.pr >= cfg.want, d = b.d;
   h.className = 'call' + (ok ? '' : ' calm');
@@ -592,6 +594,100 @@ function endTrip() {
   coachStop(); trip = null; drawTrip(); render();
 }
 
+/* ---------- maps inside the Board (MapLibre loaded only when needed) ---------- */
+let mlP = null;
+function loadML() {
+  if (window.maplibregl && window.CIStyle) return Promise.resolve();
+  return mlP || (mlP = new Promise((ok, no) => {
+    const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'https://unpkg.com/maplibre-gl@5.24.1/dist/maplibre-gl.css'; document.head.appendChild(l);
+    const s = document.createElement('script'); s.src = 'https://unpkg.com/maplibre-gl@5.24.1/dist/maplibre-gl.js';
+    s.onload = () => { const s2 = document.createElement('script'); s2.src = 'mapstyle.js'; s2.onload = ok; s2.onerror = no; document.head.appendChild(s2); }; s.onerror = no; document.head.appendChild(s);
+  }));
+}
+const EMPTY = {type: 'FeatureCollection', features: []};
+/* Catch zone: a live isochrone around the station. Each ring is how far away you could be right now and still
+   make this departure at that speed: r = v × (time to departure − platform walk − buffer − pick-up) ÷ 1.3 detour.
+   Walking speed is your own (your walk time over your real distance); run, bike and lift scale from it.
+   Everything outside the biggest ring is greyed out; the rings shrink every second. */
+const Z = {map: null, ready: false, b: null, key: '', fit: false};
+async function zoneDraw(b) {
+  const box = $('#zone');
+  if (!b || !b.p?.lat || demo && !b.p.lat) { box.hidden = true; Z.b = null; return; }
+  box.hidden = false; Z.b = b; if (Z.key !== b.d.key) { Z.key = b.d.key; Z.fit = true; }
+  try { await loadML(); } catch (e) { box.hidden = true; return; }
+  if (!Z.map) {
+    Z.map = new maplibregl.Map({container: 'zmap', style: 'https://tiles.openfreemap.org/styles/liberty', center: [b.p.lon, b.p.lat], zoom: 14, dragRotate: false, pitchWithRotate: false, touchPitch: false, attributionControl: false});
+    Z.map.on('style.load', () => {
+      const m = Z.map; CIStyle.restyle(m);
+      m.addSource('zmask', {type: 'geojson', data: EMPTY}); m.addSource('zr', {type: 'geojson', data: EMPTY}); m.addSource('zl', {type: 'geojson', data: EMPTY}); m.addSource('zp', {type: 'geojson', data: EMPTY});
+      m.addLayer({id: 'zmask', type: 'fill', source: 'zmask', paint: {'fill-color': '#1C2129', 'fill-opacity': 0.42}});
+      m.addLayer({id: 'zfill', type: 'fill', source: 'zr', paint: {'fill-color': ['get', 'c'], 'fill-opacity': 0.07}});
+      m.addLayer({id: 'zline', type: 'line', source: 'zr', paint: {'line-color': ['get', 'c'], 'line-width': 3}});
+      m.addLayer({id: 'zlab', type: 'symbol', source: 'zl', layout: {'text-field': ['get', 't'], 'text-font': ['Noto Sans Bold'], 'text-size': 12, 'text-offset': [0, -0.7], 'text-allow-overlap': true}, paint: {'text-color': ['get', 'c'], 'text-halo-color': '#ffffff', 'text-halo-width': 2}});
+      m.addLayer({id: 'zpt', type: 'circle', source: 'zp', paint: {'circle-radius': ['match', ['get', 'k'], 'st', 9, 8], 'circle-color': ['match', ['get', 'k'], 'st', '#FFD100', '#2f6fde'], 'circle-stroke-color': ['match', ['get', 'k'], 'st', '#000000', '#ffffff'], 'circle-stroke-width': 3}});
+      Z.ready = true; zoneTick();
+    });
+  }
+}
+function zoneTick() {
+  if (!Z.ready || !Z.b) return;
+  const b = Z.b, d = deps.find(x => x.key === b.d.key) || b.d, p = b.p, now = Date.now(), st = [p.lon, p.lat];
+  const me = coach.pos || cfg.home || null;
+  const avail = (d.t - now) / 1000 - (+p.platform || 0) * 60 - cfg.buffer;
+  let vw = 1.35; if (me && +p.walk) vw = Math.min(2, Math.max(0.8, havM(me, st) * DETOUR / (+p.walk * 60)));
+  const sp = {walk: vw, run: vw / cfg.f.run, bike: vw / cfg.f.bike, lift: vw / cfg.f.drive};
+  const rings = modesFor(p).map(m => ({m, r: Math.max(0, sp[m.k] * (avail - (m.k === 'lift' ? cfg.liftPickup * 60 : 0)) / DETOUR)})).filter(x => x.r > 10).sort((a, b) => b.r - a.r);
+  const fmt = r => r >= 1000 ? (r / 1000).toFixed(1) + ' km' : Math.round(r / 10) * 10 + ' m';
+  const m = Z.map;
+  m.getSource('zr').setData({type: 'FeatureCollection', features: rings.map(x => ({type: 'Feature', properties: {c: x.m.col}, geometry: {type: 'Polygon', coordinates: [CIStyle.ring(st, x.r)]}}))});
+  m.getSource('zl').setData({type: 'FeatureCollection', features: rings.map(x => ({type: 'Feature', properties: {c: x.m.col, t: x.m.label + ' ' + fmt(x.r)}, geometry: {type: 'Point', coordinates: [st[0], st[1] + x.r / 110540]}}))});
+  const world = [[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]];
+  m.getSource('zmask').setData({type: 'Feature', properties: {}, geometry: {type: 'Polygon', coordinates: rings.length ? [world, CIStyle.ring(st, rings[0].r).reverse()] : [world]}});
+  m.getSource('zp').setData({type: 'FeatureCollection', features: [{type: 'Feature', properties: {k: 'st'}, geometry: {type: 'Point', coordinates: st}}].concat(me ? [{type: 'Feature', properties: {k: 'me'}, geometry: {type: 'Point', coordinates: me}}] : [])});
+  const dMe = me ? havM(me, st) : null, inside = me ? [...rings].reverse().find(x => dMe <= x.r) : null;
+  $('#zcap').innerHTML = !rings.length ? 'Too late for every way of getting there. Check Plan B.'
+    : !me ? `Be inside a ring to make the ${hhmm(d.t)}. Rings shrink as time runs out.`
+    : inside ? `You're inside the <b style="color:${inside.m.col}">${inside.m.label.toLowerCase()}</b> ring, so ${inside.m.k === 'walk' ? 'walking is enough' : inside.m.k === 'lift' ? 'only a lift gets you there' : inside.m.label.toLowerCase() + 'ning gets you there'}.`
+    : `You're outside every ring. This one has gone for you, so check Plan B.`;
+  if (Z.fit) {
+    Z.fit = false; const fitR = (rings.find(x => x.m.k !== 'lift') || rings[0])?.r || 400;
+    let bb = CIStyle.ring(st, Math.max(fitR, 250), 16); if (me) bb = bb.concat([me]);
+    const lo = bb.map(q => q[0]), la = bb.map(q => q[1]);
+    m.fitBounds([[Math.min(...lo), Math.min(...la)], [Math.max(...lo), Math.max(...la)]], {padding: 22, duration: 900});
+  }
+}
+setInterval(zoneTick, 1000);
+
+/* Where-to route map: the journey draws itself leg by leg in line colours, once, when the plan appears */
+const RM = {map: null, raf: 0};
+async function routeMap(r) {
+  const el = $('#rmap'); if (!el) return;
+  try { await loadML(); } catch (e) { el.remove(); return; }
+  cancelAnimationFrame(RM.raf); try { RM.map?.remove(); } catch (e) {}
+  const legs = r.legs.map(l => { let pts = []; try { pts = JSON.parse(l.path?.lineString || '[]').map(q => [q[1], q[0]]); } catch (e) {} if (pts.length < 2 && l.departurePoint?.lat) pts = [[l.departurePoint.lon, l.departurePoint.lat], [l.arrivalPoint.lon, l.arrivalPoint.lat]]; return {l, pts, walk: l.mode.id === 'walking', col: l.mode.id === 'walking' ? '#5A616C' : legCol(l)}; }).filter(x => x.pts.length > 1);
+  if (!legs.length) { el.remove(); return; }
+  const all = legs.flatMap(x => x.pts), lo = all.map(q => q[0]), la = all.map(q => q[1]);
+  const m = RM.map = new maplibregl.Map({container: el, style: 'https://tiles.openfreemap.org/styles/liberty', bounds: [[Math.min(...lo), Math.min(...la)], [Math.max(...lo), Math.max(...la)]], fitBoundsOptions: {padding: 26}, dragRotate: false, attributionControl: false});
+  m.on('style.load', () => {
+    CIStyle.restyle(m);
+    legs.forEach((x, i) => {
+      m.addSource('lg' + i, {type: 'geojson', lineMetrics: true, data: {type: 'Feature', properties: {}, geometry: {type: 'LineString', coordinates: x.pts}}});
+      if (!x.walk) m.addLayer({id: 'lc' + i, type: 'line', source: 'lg' + i, layout: {'line-cap': 'round', 'line-join': 'round'}, paint: {'line-color': '#ffffff', 'line-width': 9, 'line-gradient': ['step', ['line-progress'], '#ffffff', 0, 'rgba(0,0,0,0)']}});
+      m.addLayer({id: 'lg' + i, type: 'line', source: 'lg' + i, layout: {'line-cap': 'round', 'line-join': 'round'}, paint: {'line-width': x.walk ? 3 : 5, 'line-gradient': ['step', ['line-progress'], x.col, 0, 'rgba(0,0,0,0)']}});
+    });
+    const ends = {type: 'FeatureCollection', features: [{type: 'Feature', properties: {k: 'a'}, geometry: {type: 'Point', coordinates: legs[0].pts[0]}}, {type: 'Feature', properties: {k: 'b'}, geometry: {type: 'Point', coordinates: legs.at(-1).pts.at(-1)}}]};
+    m.addSource('ends', {type: 'geojson', data: ends});
+    m.addLayer({id: 'ends', type: 'circle', source: 'ends', paint: {'circle-radius': 7, 'circle-color': ['match', ['get', 'k'], 'a', '#2f6fde', '#1C2129'], 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 3}});
+    const dur = legs.map(x => Math.max(1, x.l.duration)), tot = dur.reduce((a, b) => a + b, 0), T = matchMedia('(prefers-reduced-motion: reduce)').matches ? 1 : 1800, t0 = performance.now();
+    const step = now => {
+      const f = Math.min(1, (now - t0) / T) * tot; let acc = 0;
+      legs.forEach((x, i) => { const g = Math.max(0, Math.min(1, (f - acc) / dur[i])); acc += dur[i]; const grad = c => g >= 1 ? ['step', ['line-progress'], c, 1, c] : ['step', ['line-progress'], c, Math.max(0.0001, g), 'rgba(0,0,0,0)']; try { m.setPaintProperty('lg' + i, 'line-gradient', grad(x.col)); if (!x.walk) m.setPaintProperty('lc' + i, 'line-gradient', grad('#ffffff')); } catch (e) {} });
+      if (f < tot) RM.raf = requestAnimationFrame(step);
+    };
+    RM.raf = requestAnimationFrame(step);
+  });
+}
+
 /* ---------- Where to? Journeys other apps hide ----------
    Map apps plan as if you walk to the first stop. We ask TfL's Journey Planner for journeys that
    started up to 15 minutes ago too, then re-time the first walk at your own run / bike / lift speed.
@@ -655,10 +751,12 @@ function drawPlan() {
   $('#wRes').innerHTML = `<div class="plan">
     <h3>To ${esc(WQ.to.name)}</h3><p class="note" style="margin:0 0 6px">from ${esc(origin().name || 'here')} · leaving now</p>
     <p style="margin:6px 0 4px;font-size:18px">${headline}</p>
+    <div class="rmap" id="rmap" role="img" aria-label="Map of the fastest route"></div><p class="mcred" style="padding:0">Map © OpenFreeMap, © OpenStreetMap contributors</p>
     ${opts.map(p => { const g = pick.filter(q => q.r === p.r); return `<div class="rr ${p.r === bestP.r ? 'best' : ''}"><span class="md">${g.map(q => `<span style="color:${q.m.col}" title="${q.m.label}">${svgI(q.m.k)}</span>`).join('')}</span><div class="rb"><i style="width:${Math.max(8, (p.r.arr - now) / span * 100)}%;background:${g[0].m.col}">${p.r.tl ? esc((p.r.tl.routeOptions?.[0]?.name || p.r.tl.mode.name) + ' ' + hhmm(p.r.dep)) : 'all the way'}</i></div><b>${hhmm(p.r.arr)}</b></div>`; }).join('')}
     ${opts.map(p => { const c = p.c, others = pick.filter(q => q.r === p.r).map(q => q.m.label).join(' / '); return `<div class="opt"><div class="row3"><span><b>${p.r.tl ? esc(p.r.tl.routeOptions?.[0]?.name || p.r.tl.mode.name) : 'Walk'}</b> ${p.r.tl ? 'from ' + esc(p.r.tl.departurePoint.commonName) + ' at ' + hhmm(p.r.dep) : ''}</span><span class="note">arrive ${hhmm(p.r.arr)}</span></div>
       ${legsBar(p.r)}<div class="row3"><span class="g" style="font-weight:700" data-lv="${p.r.dep || p.r.start}" data-k="${p.m.k}" data-w="${p.r.w}">${others}: leave ${c.leave > 30 ? 'in ' + mmss(c.leave) : 'now'}</span><button class="go" data-o="${R.indexOf(p.r)}" data-m="${p.m.k}">Go</button></div></div>`; }).join('')}
     <p class="note" style="margin:10px 0 0">Journey data: TfL Journey Planner. Run, bike and lift timings are yours, learned on the Board.</p></div>`;
+  routeMap(bestP.r);
   $('#wRes').querySelectorAll('.go').forEach(b => b.addEventListener('click', () => goJourney(R[+b.dataset.o], b.dataset.m)));
 }
 function goJourney(r, k) {

@@ -100,6 +100,7 @@ details summary{cursor:pointer;font-weight:600;font-size:14px;margin:8px 0}
 <script src="https://unpkg.com/maplibre-gl@5.24.1/dist/maplibre-gl.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="world3d.js"></script>
+<script src="mapstyle.js"></script>
 <script>
 {
 const TFL = 'https://api.tfl.gov.uk';
@@ -167,7 +168,8 @@ document.querySelectorAll('.seg button').forEach(b => { b.setAttribute('aria-pre
 map.on('style.load', addOverlays);
 function addOverlays() {
   const is3d = deep(cfg.view);
-  if (cfg.view === 'map') { try { if (map.getLayer('building-3d')) { map.setPaintProperty('building-3d', 'fill-extrusion-color', BLD_COL); map.setPaintProperty('building-3d', 'fill-extrusion-opacity', 1); } } catch (e) {} }
+  if (cfg.view === 'map') window.CIStyle?.restyle(map);
+  if (cfg.view === 'map') { try { if (map.getLayer('building-3d')) { map.setPaintProperty('building-3d', 'fill-extrusion-color', window.CIStyle ? CIStyle.C.bld : BLD_COL); map.setPaintProperty('building-3d', 'fill-extrusion-opacity', 1); } } catch (e) {} }
   if (cfg.view === '3d') {
     if (!map.getSource('dem')) map.addSource('dem', {type: 'raster-dem', tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], encoding: 'terrarium', tileSize: 256, maxzoom: 15, attribution: 'Terrain: AWS Terrain Tiles'});
     try { map.setTerrain({source: 'dem', exaggeration: cfg.exag || 1}); } catch (e) {}
@@ -425,8 +427,8 @@ function drawLine(l) {
   if (map.getSource(id)) return;
   map.addSource(id, {type: 'geojson', data: fc});
   const before = map.getLayer('veh-dot') ? 'veh-dot' : undefined;
-  map.addLayer({id: id + '-c', type: 'line', source: id, paint: {'line-color': '#ffffff', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 3, 16, 8], 'line-opacity': 0.7}, layout: {'line-cap': 'round', 'line-join': 'round'}}, before);
-  map.addLayer({id, type: 'line', source: id, paint: {'line-color': l.colour, 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 1.5, 16, 4], 'line-opacity': 0.85}, layout: {'line-cap': 'round', 'line-join': 'round'}}, before);
+  map.addLayer({id: id + '-c', type: 'line', source: id, paint: {'line-color': '#ffffff', 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 4, 16, 12], 'line-opacity': 0.95}, layout: {'line-cap': 'round', 'line-join': 'round'}}, before);
+  map.addLayer({id, type: 'line', source: id, paint: {'line-color': l.colour, 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 2.2, 16, 7], 'line-opacity': 1}, layout: {'line-cap': 'round', 'line-join': 'round'}}, before);
 }
 function hideLine(l) { for (const id of ['ln-' + l.id, 'ln-' + l.id + '-c']) if (map.getLayer(id)) map.removeLayer(id); if (map.getSource('ln-' + l.id)) map.removeSource('ln-' + l.id); }
 
