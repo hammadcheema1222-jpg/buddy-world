@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#14162b">
+<title>Catch It</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='11' fill='none' stroke='%236950a1' stroke-width='6'/%3E%3Crect x='1' y='13' width='30' height='6' fill='%23c8102e'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+/* VOICE: calm station signage, loud only when you must move
+   IDEA: a race track per departure: the train slides toward you
+   PICTURE: the live Race Strip board, nothing above it but the call
+   COLOUR+TYPE: ink on white, official line colours, Overpass tabular numerals
+   LAYOUT: top bar, one big recommendation, the board, drawers for detail and setup */
+:root{color-scheme:light dark;--bg:light-dark(#ffffff,#0f1122);--panel:light-dark(#f3f4f8,#181b33);--ink:light-dark(#14162b,#eef0fb);--muted:light-dark(#5d6275,#a3a8c3);--line:light-dark(#dfe2ec,#2a2e4d);--go:light-dark(#0c7a52,#3dd39a);--risk:light-dark(#a05d00,#f2b33d);--no:light-dark(#8a8f9e,#6d728c);--bad:light-dark(#c8102e,#ff6b7d);--hero:#14162b;--heroInk:#ffffff}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Overpass,system-ui,sans-serif;overflow-x:clip;font-variant-numeric:tabular-nums}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--bg);padding:0 14px;font-weight:600}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #6950a1;outline-offset:2px}
+input,select{min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--bg);padding:0 12px;font-size:16px;width:100%}
+.top{display:flex;align-items:center;gap:10px;padding:10px max(4vw,14px);border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg);z-index:5}
+.logo{font-weight:800;font-size:20px;letter-spacing:-.01em;display:flex;align-items:center;gap:8px}
+.logo i{display:inline-block;width:22px;height:22px;border-radius:50%;border:5px solid #6950a1;position:relative}
+.logo i::after{content:"";position:absolute;left:-7px;right:-7px;top:3px;height:6px;background:#c8102e}
+.clock{font-weight:600;color:var(--muted)}
+.nav{display:flex;gap:2px;margin-left:auto}.nav a{padding:10px 10px;border-radius:10px;color:var(--ink);text-decoration:none;font-weight:600}.nav a[aria-current]{background:var(--panel)}
+@media(max-width:600px){.lt,.clock{display:none}.nav a{padding:8px 6px;font-size:15px}.top button{padding:0 10px}}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--no)}.dot.live{background:var(--go)}.dot.err{background:var(--bad)}
+.toggle[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.wrap{max-width:980px;margin:0 auto;padding:16px max(4vw,14px) 60px}
+.hero{background:var(--hero);color:var(--heroInk);border-radius:18px;padding:20px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:20px;align-items:center}
+.ring{width:118px;height:118px;position:relative}.ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring b{position:absolute;inset:0;display:grid;place-items:center;font-size:26px;font-weight:800;line-height:1}
+.ring small{display:block;font-size:12px;font-weight:600;opacity:.75;text-align:center;margin-top:4px}
+.hero h1{margin:0;font-size:clamp(22px,3.4vw,32px);line-height:1.1;text-wrap:balance}
+.hero p{margin:6px 0 12px;opacity:.85}
+.hero .acts{display:flex;gap:8px;flex-wrap:wrap}
+.hero button{background:transparent;color:#fff;border-color:rgba(255,255,255,.35)}
+.hero button.main{background:#fff;color:var(--hero);border-color:#fff}
+.hero.calm{background:var(--panel);color:var(--ink)}.hero.calm button{color:var(--ink);border-color:var(--line)}
+.trip{margin-top:12px;border:2px dashed #6950a1;border-radius:14px;padding:12px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.trip b{font-size:22px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;color:var(--muted);font-size:13px;margin:18px 2px 6px}
+.legend span{display:inline-flex;gap:6px;align-items:center}.legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.row{border-bottom:1px solid var(--line);padding:12px 2px;display:grid;grid-template-columns:64px minmax(0,1fr) 84px;gap:4px 12px;align-items:center;cursor:pointer}
+.row:hover{background:var(--panel)}
+.row.gone{opacity:.45}
+.badge{grid-row:span 2;height:40px;border-radius:8px;color:#fff;font-weight:800;display:grid;place-items:center;font-size:15px;padding:0 4px;text-align:center;line-height:1}
+.dest{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dest small{color:var(--muted);font-weight:400;margin-left:6px}
+.when{text-align:right;font-weight:800;font-size:20px;grid-row:span 2;line-height:1.1}
+.when small{display:block;font-size:12px;color:var(--muted);font-weight:600}
+.track{position:relative;height:44px;border-radius:12px;background:var(--panel);overflow:hidden}
+.track .tick{position:absolute;bottom:2px;font-size:10px;color:var(--muted);transform:translateX(-50%);font-weight:600}
+.track .tick::before{content:"";position:absolute;left:50%;bottom:13px;width:1px;height:28px;background:var(--line)}
+.track .fill{position:absolute;left:0;top:0;bottom:0;background:light-dark(#e6e1f4,#272246)}
+.track .now{position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--ink)}
+.mk{position:absolute;transform:translate(-50%,-50%);will-change:left}
+.veh{top:13px;width:32px;height:18px;border-radius:5px;color:#fff;font-size:10px;font-weight:800;display:grid;place-items:center;box-shadow:0 1px 3px rgba(0,0,0,.25);z-index:2}
+.you{top:29px;width:16px;height:16px;border-radius:50%;border:2px solid var(--bg);font-size:8px;font-weight:800;color:#fff;display:grid;place-items:center}
+.chips{grid-column:2;display:flex;gap:6px;flex-wrap:wrap;font-size:13px;font-weight:600}
+.chip{padding:1px 8px;border-radius:99px;border:1.5px solid currentColor;white-space:nowrap}
+.g{color:var(--go)}.a{color:var(--risk)}.n{color:var(--no)}.x{color:var(--bad)}
+.empty{text-align:center;padding:40px 16px;color:var(--muted)}
+.empty h2{color:var(--ink);margin:0 0 6px}
+.note{font-size:13px;color:var(--muted)}
+.drawer{position:fixed;inset:0;background:rgba(10,12,30,.45);display:none;z-index:20}
+.drawer.open{display:block}
+.sheet{position:absolute;right:0;top:0;bottom:0;width:min(520px,100%);background:var(--bg);overflow:auto;padding:18px 18px 40px;box-shadow:-8px 0 30px rgba(0,0,0,.2)}
+.sheet h2{margin:0 0 4px;font-size:24px;line-height:1.15}
+.sheet h3{margin:20px 0 8px;font-size:16px}
+.close{float:right}
+.field{display:grid;gap:4px;margin:10px 0}.field label{font-size:13px;color:var(--muted);font-weight:600}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.place{border:1px solid var(--line);border-radius:12px;padding:12px;margin:10px 0}
+.place header{display:flex;justify-content:space-between;align-items:center;gap:8px;font-weight:800}
+.modes{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.modes label{display:flex;gap:6px;align-items:center;border:1px solid var(--line);border-radius:99px;padding:6px 12px;font-size:14px}
+.modes input{width:auto;min-height:0}
+.res{display:grid;gap:6px;margin-top:8px}
+.res button{text-align:left;font-weight:400;height:auto;padding:8px 12px}
+.res button b{display:block}
+.stops{list-style:none;margin:0;padding:0;position:relative}
+.stops li{padding:8px 0 8px 28px;border-left:3px solid var(--line);margin-left:10px;position:relative;display:flex;justify-content:space-between;gap:10px}
+.stops li::before{content:"";position:absolute;left:-8px;top:13px;width:13px;height:13px;border-radius:50%;background:var(--bg);border:3px solid var(--muted)}
+.busnow{position:absolute;left:1px;width:22px;height:22px;border-radius:6px;color:#fff;font-size:10px;font-weight:800;display:grid;place-items:center;transition:top .9s linear}
+.err{color:var(--bad);font-size:14px;margin-top:8px}
+.coaches{display:flex;gap:3px;margin:8px 0}.coaches span{flex:1;height:26px;border-radius:5px;background:var(--panel);position:relative;overflow:hidden;font-size:11px;display:grid;place-items:center;font-weight:600}
+.coaches span i{position:absolute;left:0;bottom:0;right:0;background:var(--risk);opacity:.35}
+@media(max-width:600px){.hero{grid-template-columns:1fr;text-align:center}.ring{margin:0 auto}.hero .acts{justify-content:center}.row{grid-template-columns:52px minmax(0,1fr) 70px}.when{font-size:17px}.grid2{grid-template-columns:1fr}}
+@media(max-width:600px){.track .tick:first-of-type{display:none}}
+@media(prefers-reduced-motion:reduce){.busnow{transition:none}}
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="logo"><i></i><span class="lt">Catch It</span></div>
+  <span class="dot" id="dot" title="Live status"></span>
+  <nav class="nav"><a href="./" aria-current="page">Board</a><a href="map.html">Map</a><a href="station.html">Station</a></nav>
+  <span class="clock" id="clock">--:--:--</span>
+  <button class="toggle" id="liftBtn" aria-pressed="false" title="A lift is available">Lift</button>
+  <button id="setBtn">Setup</button>
+</div>
+<main class="wrap">
+  <section id="hero" class="hero calm"></section>
+  <div id="tripBox"></div>
+  <div class="legend" id="legend"></div>
+  <section id="board" aria-live="polite"></section>
+  <p class="note" id="foot"></p>
+</main>
+
+<div class="drawer" id="detail"><div class="sheet" id="detailSheet"></div></div>
+<div class="drawer" id="setup"><div class="sheet" id="setupSheet"></div></div>
+
+<script>
+{
+const TFL = 'https://api.tfl.gov.uk';
+const RDM = 'https://api1.raildata.org.uk/';
+const RDM_PATHS = ['1010-live-departure-board-dep1_2','1010-live-departure-board-dep','1010-live-departure-board-dep1_1'];
+const MODES = [
+  {k:'walk', label:'Walk', short:'W', col:'#2f6fde'},
+  {k:'run', label:'Run', short:'R', col:'#e0571f'},
+  {k:'bike', label:'Bike', short:'B', col:'#0f9d8a'},
+  {k:'lift', label:'Lift', short:'L', col:'#8a3fc7'}
+];
+const LINE_COL = {elizabeth:'#6950a1','elizabeth-line':'#6950a1',bus:'#c8102e',central:'#dc241f',jubilee:'#7b868c',district:'#00782a',hammersmith:'#f589a6',circle:'#d4a900',metropolitan:'#9b0058',northern:'#1c1c1c',piccadilly:'#0019a8',victoria:'#0098d4',bakerloo:'#b36305','waterloo-city':'#4bb5a7',dlr:'#00a4a7',overground:'#ee7c0e',tram:'#5fb526',LE:'#d70428',XR:'#6950a1'};
+const DEFAULT = {places:[], f:{run:0.55, bike:0.4, drive:0.3}, liftPickup:5, liftOn:false, buffer:30, window:40, darwinKey:'', darwinPath:'', want:0.8};
+const $ = s => document.querySelector(s);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const load = () => { try { return Object.assign(structuredClone(DEFAULT), JSON.parse(localStorage.getItem('catchit.v1') || '{}')); } catch (e) { return structuredClone(DEFAULT); } };
+const save = () => { try { localStorage.setItem('catchit.v1', JSON.stringify(cfg)); } catch (e) {} };
+let cfg = load();
+let deps = [];            // merged departures
+const kf = {};            // Kalman state per departure key
+const shown = {};         // eased display time per key
+let wx = {rain:0, temp:null, wind:null};
+let demo = false, lastOk = 0, lastErr = '';
+let trip = null;          // {placeId, mode, start}
+let remind = null;
+
+/* ---------- maths ---------- */
+const erf = x => { const s = Math.sign(x); x = Math.abs(x); const t = 1 / (1 + 0.3275911 * x); const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x); return s * y; };
+const Phi = z => 0.5 * (1 + erf(z / Math.SQRT2));
+function modeSecs(p, m) {
+  const L = p.learned || {}, W = +p.walk || 0, F = cfg.f;
+  let mins;
+  if (m === 'walk') mins = L.walk ?? W;
+  else if (m === 'run') mins = L.run ?? W * F.run;
+  else if (m === 'bike') mins = L.bike ?? W * F.bike;
+  else mins = cfg.liftPickup + (L.lift ?? W * F.drive);
+  const wet = (m !== 'lift' && wx.rain > 0.2) ? 1.08 : 1;
+  return (mins * wet + (+p.platform || 0)) * 60;
+}
+function modeSigma(p, m, T) { return 0.12 * T + 20 + (m === 'lift' ? cfg.liftPickup * 15 : 0); }
+function modesFor(p) { return MODES.filter(m => p.modes?.[m.k] !== false && (m.k !== 'lift' || cfg.liftOn)); }
+function chance(d, p, m, now) {
+  if (d.cancelled) return 0;
+  const T = modeSecs(p, m), sm = modeSigma(p, m, T);
+  const z = ((d.t - now) / 1000 - T - cfg.buffer) / Math.sqrt(d.sigma ** 2 + sm ** 2);
+  return Phi(z);
+}
+function leaveIn(d, p, m, now) {           // seconds until you must leave for cfg.want chance
+  const T = modeSecs(p, m), sm = modeSigma(p, m, T);
+  const zq = 0.8416; // z for 80%
+  return (d.t - now) / 1000 - T - cfg.buffer - zq * Math.sqrt(d.sigma ** 2 + sm ** 2);
+}
+function kalman(key, z, sigma) {           // 1D Kalman filter on the predicted departure time (ms)
+  const R = (sigma * 1000) ** 2, Q = (10000) ** 2;
+  const s = kf[key];
+  if (!s || Math.abs(z - s.t) > 180000) { kf[key] = {t: z, P: R}; return z; }
+  s.P += Q; const K = s.P / (s.P + R); s.t += K * (z - s.t); s.P *= (1 - K); return s.t;
+}
+const cls = pr => pr >= 0.8 ? 'g' : pr >= 0.4 ? 'a' : 'n';
+const mmss = s => { const neg = s < 0; s = Math.abs(Math.round(s)); const m = Math.floor(s / 60), r = s % 60; return (neg ? '-' : '') + m + ':' + String(r).padStart(2, '0'); };
+const hhmm = t => new Date(t).toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'});
+function nrTime(hm, now) {
+  const [h, m] = hm.split(':').map(Number); const d = new Date(now); d.setHours(h, m, 0, 0);
+  let t = d.getTime(); if (t < now - 12 * 3600e3) t += 864e5; if (t > now + 12 * 3600e3) t -= 864e5; return t;
+}
+
+/* ---------- feeds ---------- */
+async function getJSON(url, opt) { const r = await fetch(url, opt); if (!r.ok) throw new Error(r.status + ' ' + url.split('?')[0].slice(0, 60)); return r.json(); }
+function keep(p, d) {
+  if (!p.only) return true;
+  const toks = p.only.toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
+  const hay = (d.line + ' ' + d.dest + ' ' + (d.platform || '')).toLowerCase();
+  return toks.some(t => hay.includes(t));
+}
+async function fromTfl(p, now) {
+  const a = await getJSON(TFL + '/StopPoint/' + encodeURIComponent(p.tflId) + '/Arrivals');
+  return a.map(x => ({
+    key: 'tfl|' + p.id + '|' + x.lineId + '|' + x.vehicleId,
+    src: 'TfL', mode: x.modeName, line: x.lineName, lineId: x.lineId,
+    colour: LINE_COL[x.lineId] || LINE_COL[x.modeName] || '#3b3f5c',
+    dest: (x.destinationName || x.towards || '').replace(/ (Rail|Underground|DLR) Station$/, ''),
+    platform: x.modeName === 'bus' ? (x.platformName && x.platformName !== 'null' ? 'Stop ' + x.platformName : '') : x.platformName,
+    raw: Date.parse(x.expectedArrival), sigma: x.modeName === 'bus' ? 60 : 45,
+    vehicleId: x.vehicleId, placeId: p.id
+  }));
+}
+async function fromDarwin(p, now) {
+  if (!cfg.darwinKey || !p.crs) return [];
+  const paths = cfg.darwinPath ? [cfg.darwinPath] : RDM_PATHS;
+  let data = null, lastE = null;
+  for (const path of paths) {
+    try { data = await getJSON(RDM + path + '/LDBWS/api/20220120/GetDepBoardWithDetails/' + encodeURIComponent(p.crs.toUpperCase()) + '?numRows=20', {headers: {'x-apikey': cfg.darwinKey}}); cfg.darwinPath = path; save(); break; }
+    catch (e) { lastE = e; }
+  }
+  if (!data) throw lastE || new Error('Darwin');
+  return (data.trainServices || []).filter(s => !(p.tflId && s.operatorCode === 'XR')).map(s => {
+    const std = nrTime(s.std, now); const etd = s.etd || '';
+    const cancelled = s.isCancelled || /cancel/i.test(etd);
+    const t = /^\d\d:\d\d$/.test(etd) ? nrTime(etd, now) : std;
+    const calls = (s.subsequentCallingPoints?.[0]?.callingPoint || []).map(c => ({name: c.locationName, t: c.st, et: c.et}));
+    const hk = p.id + '|' + s.std + '|' + (s.destination?.[0]?.locationName || '');
+    if (s.platform) platLog(hk, s.platform);
+    const guess = !s.platform ? platGuess(hk) : null;
+    return {
+      key: 'nr|' + p.id + '|' + s.serviceID, src: 'National Rail', mode: 'rail', line: s.operator || 'Rail', lineId: s.operatorCode,
+      colour: LINE_COL[s.operatorCode] || '#3b3f5c', dest: s.destination?.[0]?.locationName || '', platform: s.platform ? 'Platform ' + s.platform : guess ? `Platform tbc, usually ${guess.p} (${guess.n} of ${guess.of})` : 'Platform tbc',
+      raw: t, sigma: /delay/i.test(etd) ? 300 : 60, cancelled, status: etd, coaches: +s.length || 0, calls, placeId: p.id, std: s.std
+    };
+  });
+}
+/* platform history: which platform each regular service used, counted once per day */
+let plat = {}; try { plat = JSON.parse(localStorage.getItem('catchit.plat') || '{}'); } catch (e) {}
+function platLog(k, pf) {
+  const day = new Date().toISOString().slice(0, 10), h = plat[k] = plat[k] || {days: {}};
+  if (h.days[day] === pf) return; h.days[day] = pf;
+  const ds = Object.keys(h.days).sort(); while (ds.length > 30) delete h.days[ds.shift()];
+  try { localStorage.setItem('catchit.plat', JSON.stringify(plat)); } catch (e) {}
+}
+function platGuess(k) {
+  const h = plat[k]; if (!h) return null; const c = {}; const v = Object.values(h.days); v.forEach(p => c[p] = (c[p] || 0) + 1);
+  const top = Object.entries(c).sort((a, b) => b[1] - a[1])[0]; return top && v.length >= 2 ? {p: top[0], n: top[1], of: v.length} : null;
+}
+/* Monte Carlo: chance a bus gets you to a train, sampling every uncertain part */
+const gauss = () => { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+function connect(busAt, busSigma, walkSecs, train, runs = 4000) {
+  let ok = 0;
+  for (let i = 0; i < runs; i++) {
+    const arrive = busAt + gauss() * busSigma * 1000 + (walkSecs * (1 + 0.12 * gauss())) * 1000 + cfg.buffer * 1000;
+    const leave = train.t + gauss() * train.sigma * 1000;
+    if (arrive <= leave) ok++;
+  }
+  return ok / runs;
+}
+async function refresh() {
+  if (demo) { makeDemo(); return; }
+  if (!cfg.places.length) { deps = []; render(); return; }
+  const now = Date.now(); const out = []; const errs = [];
+  await Promise.all(cfg.places.map(async p => {
+    const jobs = [];
+    if (p.tflId) jobs.push(fromTfl(p, now).catch(e => { errs.push(p.name + ': ' + e.message); return []; }));
+    if (p.crs) jobs.push(fromDarwin(p, now).catch(e => { errs.push(p.name + ' (National Rail): ' + e.message); return []; }));
+    const lists = await Promise.all(jobs);
+    for (const l of lists) for (const d of l) if (keep(p, d)) out.push(d);
+  }));
+  const win = cfg.window * 60e3;
+  deps = out.filter(d => d.raw > now - 60e3 && d.raw < now + win).map(d => { d.t = kalman(d.key, d.raw, d.sigma); return d; }).sort((a, b) => a.t - b.t).slice(0, 14);
+  lastErr = errs.join(' · '); if (out.length || !errs.length) lastOk = Date.now();
+  render();
+}
+async function weather() {
+  const p = cfg.places.find(q => q.lat); if (!p || demo) return;
+  try {
+    const w = await getJSON('https://api.open-meteo.com/v1/forecast?latitude=' + p.lat + '&longitude=' + p.lon + '&current=precipitation,temperature_2m,wind_speed_10m');
+    wx = {rain: w.current.precipitation, temp: w.current.temperature_2m, wind: w.current.wind_speed_10m};
+  } catch (e) {}
+}
+
+/* ---------- demo (clearly labelled) ---------- */
+function makeDemo() {
+  const now = Date.now();
+  if (!cfg.places.some(p => p.id === 'demo1')) {
+    demoPlaces = [{id:'demo1', name:'Demo station', walk:9, platform:2, modes:{walk:true,run:true,bike:true,lift:true}}, {id:'demo2', name:'Demo bus stop', walk:3, platform:0.5, modes:{walk:true,run:true,bike:false,lift:false}}];
+  }
+  if (!demoSeed.length) {
+    const base = [[4,'Elizabeth','elizabeth','Heathrow Terminal 5','Platform 4',1],[11,'Elizabeth','elizabeth','Abbey Wood','Platform 4',1],[13,'Greater Anglia','LE','London Liverpool Street','Platform 2',1],[2,'103','bus','Rainham Station','Stop E',2],[7,'175','bus','Dagenham, Ford Works','Stop E',2],[16,'Elizabeth','elizabeth','Heathrow Terminal 5','Platform 4',1],[19,'103','bus','Rainham Station','Stop E',2],[24,'Greater Anglia','LE','London Liverpool Street','Platform 2',1]];
+    demoSeed = base.map((b, i) => ({key:'demo|' + i, src:'Demo', mode: b[2] === 'bus' ? 'bus' : 'rail', line:b[1], lineId:b[2], colour: LINE_COL[b[2]], dest:b[3], platform:b[4], raw: now + b[0] * 60e3 + (i * 17e3), sigma: 50, placeId:'demo' + b[5], coaches: b[2] === 'LE' ? 8 : 9, vehicleId: b[2] === 'bus' ? 'DEMO' + i : ''}));
+  }
+  for (const d of demoSeed) d.raw += (Math.random() - 0.5) * 20e3;
+  deps = demoSeed.filter(d => d.raw > now - 60e3).map(d => { d.t = kalman(d.key, d.raw, d.sigma); return d; }).sort((a, b) => a.t - b.t);
+  lastOk = now; lastErr = ''; render();
+}
+let demoPlaces = [], demoSeed = [];
+const placeOf = id => cfg.places.find(p => p.id === id) || demoPlaces.find(p => p.id === id);
+
+/* ---------- best option ---------- */
+function best(now) {
+  let pick = null, fallback = null;
+  for (const d of deps) {
+    const p = placeOf(d.placeId); if (!p || d.cancelled) continue;
+    for (const m of modesFor(p)) {
+      const pr = chance(d, p, m.k, now), li = leaveIn(d, p, m.k, now);
+      if (pr >= cfg.want && li >= -5) { if (!pick || d.t < pick.d.t) pick = {d, p, m, pr, li}; break; }
+      if (!fallback || pr > fallback.pr) fallback = {d, p, m, pr, li};
+    }
+  }
+  return pick || fallback;
+}
+
+/* ---------- render ---------- */
+const refs = {};
+function render() {
+  const now = Date.now();
+  $('#legend').innerHTML = deps.length ? '<span>Box = the train or bus. Dots = when you\'d reach it if you left now:</span>' + MODES.filter(m => m.k !== 'lift' || cfg.liftOn).map(m => `<span><i style="background:${m.col}"></i>${m.label}</span>`).join('') + '<span>Dot left of the box = you make it.</span>' : '';
+  const board = $('#board');
+  if (!deps.length) {
+    board.innerHTML = cfg.places.length && !demo
+      ? `<div class="empty"><h2>No departures in the next ${cfg.window} minutes</h2><p>${lastErr ? esc(lastErr) : 'Waiting for live data.'}</p></div>`
+      : `<div class="empty"><h2>Add the stops and stations you use</h2><p>Catch It shows every departure you can actually make, walking, running, by bike or with a lift.</p><p><button id="goSetup">Set up my stops</button> <button id="goDemo">See a demo</button></p></div>`;
+    $('#goSetup')?.addEventListener('click', openSetup);
+    $('#goDemo')?.addEventListener('click', () => { demo = true; refresh(); });
+  } else {
+    board.innerHTML = deps.map((d, i) => {
+      const p = placeOf(d.placeId);
+      return `<div class="row${d.cancelled ? ' gone' : ''}" data-i="${i}">
+        <div class="badge" style="background:${d.colour}">${esc(shortLine(d))}</div>
+        <div class="dest">${esc(d.dest)}<small>${esc(d.platform || '')} · ${esc(p?.name || '')}</small></div>
+        <div class="when" data-w="${i}">--<small></small></div>
+        <div class="track" data-t="${i}"><div class="fill"></div><div class="now"></div>${ticks()}
+          ${modesFor(p || {}).map(m => `<div class="mk you" data-m="${m.k}" style="background:${m.col}">${m.short}</div>`).join('')}
+          <div class="mk veh" style="background:${d.colour}">${d.mode === 'bus' ? 'BUS' : 'TRN'}</div></div>
+        <div class="chips" data-c="${i}"></div>
+      </div>`;
+    }).join('');
+    board.querySelectorAll('.row').forEach(r => r.addEventListener('click', () => openDetail(deps[+r.dataset.i])));
+  }
+  for (const k in refs) delete refs[k];
+  deps.forEach((d, i) => { refs[i] = {w: board.querySelector(`[data-w="${i}"]`), t: board.querySelector(`[data-t="${i}"]`), c: board.querySelector(`[data-c="${i}"]`)}; });
+  chips(now); heroDraw(now); foot();
+}
+const scale = s => Math.max(0, Math.min(1, Math.sqrt(Math.max(0, s) / (cfg.window * 60)))) * 100; // square-root time: near minutes get more room
+const ticks = () => [2, 5, 10, 20, 30].filter(m => m < cfg.window).map(m => `<span class="tick" style="left:${scale(m * 60)}%">${m}m</span>`).join('');
+const shortLine = d => d.mode === 'bus' ? d.line : d.lineId === 'LE' ? 'GA' : (d.lineId === 'elizabeth' || d.lineId === 'XR') ? 'ELIZ' : String(d.line).slice(0, 5).toUpperCase();
+function chips(now) {
+  deps.forEach((d, i) => {
+    const r = refs[i]; if (!r?.c) return; const p = placeOf(d.placeId);
+    if (d.cancelled) { r.c.innerHTML = `<span class="chip x">Cancelled${d.status ? ' · ' + esc(d.status) : ''}</span>`; return; }
+    r.c.innerHTML = modesFor(p).map(m => { const pr = chance(d, p, m.k, now); return `<span class="chip ${cls(pr)}">${m.label} ${Math.round(pr * 100)}%</span>`; }).join('') + (d.status && !/on time/i.test(d.status) ? `<span class="chip a">${esc(d.status)}</span>` : '');
+  });
+}
+function heroDraw(now) {
+  const h = $('#hero'), b = best(now);
+  if (!b) { h.className = 'hero calm'; h.innerHTML = `<div class="ring"><b>--</b></div><div><h1>${demo ? 'Demo mode' : 'Nothing to catch yet'}</h1><p>${demo ? 'Sample departures, not live data.' : 'Add your stops in Setup to see live departures.'}</p><div class="acts">${demo ? '<button id="exitDemo">Exit demo</button>' : ''}</div></div>`; $('#exitDemo')?.addEventListener('click', exitDemo); return; }
+  const ok = b.pr >= cfg.want;
+  h.className = 'hero' + (ok ? '' : ' calm');
+  h.innerHTML = `<div class="ring"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="52" fill="none" stroke="${ok ? 'rgba(255,255,255,.18)' : 'var(--line)'}" stroke-width="10"/><circle id="arc" cx="60" cy="60" r="52" fill="none" stroke="${b.m.col}" stroke-width="10" stroke-linecap="round" stroke-dasharray="327" stroke-dashoffset="0"/></svg><b><span><span id="leaveTxt">--</span><small id="leaveLbl">leave in</small></span></b></div>
+    <div><h1>${esc(b.m.label)} to ${esc(b.p.name)} for the ${hhmm(b.d.t)} ${esc(shortName(b.d))}</h1>
+    <p>To ${esc(b.d.dest)} · ${esc(b.d.platform || '')} · <span id="heroPr">${Math.round(b.pr * 100)}</span>% chance${demo ? ' · demo data' : ''}</p>
+    <div class="acts"><button class="main" id="goBtn">I'm going</button><button id="remBtn">${remind ? 'Reminder set' : 'Remind me to leave'}</button>${demo ? '<button id="exitDemo">Exit demo</button>' : ''}</div></div>`;
+  h.dataset.key = b.d.key; h.dataset.m = b.m.k;
+  $('#goBtn').addEventListener('click', () => startTrip(b.p, b.m.k));
+  $('#remBtn').addEventListener('click', () => setRemind(b));
+  $('#exitDemo')?.addEventListener('click', exitDemo);
+}
+const shortName = d => d.mode === 'bus' ? d.line + ' bus' : d.line;
+function exitDemo() { demo = false; demoSeed = []; deps = []; refresh(); }
+function foot() {
+  const age = lastOk ? Math.round((Date.now() - lastOk) / 1000) : null;
+  $('#dot').className = 'dot ' + (lastErr ? 'err' : age !== null && age < 90 ? 'live' : '');
+  $('#foot').innerHTML = (demo ? 'Demo data, not live. ' : 'Live data: TfL Unified API' + (cfg.darwinKey ? ', National Rail Darwin' : '') + '. ') + (wx.temp !== null ? `Weather ${Math.round(wx.temp)}°C${wx.rain > 0.2 ? ', raining: walking and running times +8%' : ''}. ` : '') + (lastErr ? '<span class="err">' + esc(lastErr) + '</span>' : '');
+}
+
+/* ---------- animation loop ---------- */
+let lastChip = 0, lastFrame = performance.now();
+function frame(ts) {
+  const now = Date.now(), dt = Math.min(0.1, (ts - lastFrame) / 1000); lastFrame = ts;
+  $('#clock').textContent = new Date(now).toLocaleTimeString('en-GB');
+  const win = cfg.window * 60;
+  deps.forEach((d, i) => {
+    const r = refs[i]; if (!r?.t) return;
+    shown[d.key] = shown[d.key] == null ? d.t : shown[d.key] + (d.t - shown[d.key]) * Math.min(1, dt * 1.5);
+    const secs = (shown[d.key] - now) / 1000;
+    r.w.firstChild.nodeValue = d.cancelled ? '—' : secs <= 30 ? 'due' : mmss(secs);
+    r.w.lastChild.textContent = hhmm(d.t);
+    const veh = r.t.querySelector('.veh'); veh.style.left = `max(18px, ${scale(secs)}%)`;
+    r.t.querySelector('.fill').style.width = scale(secs) + '%';
+    const p = placeOf(d.placeId);
+    r.t.querySelectorAll('.you').forEach(y => { y.style.left = `max(10px, ${scale(modeSecs(p, y.dataset.m))}%)`; });
+  });
+  const h = $('#hero'); const d = deps.find(x => x.key === h.dataset.key);
+  if (d && $('#leaveTxt')) {
+    const p = placeOf(d.placeId), li = leaveIn(d, p, h.dataset.m, now);
+    $('#leaveTxt').textContent = li <= 0 ? 'Now' : mmss(li);
+    $('#leaveLbl').textContent = li <= 0 ? 'leave' : 'leave in';
+    $('#arc').setAttribute('stroke-dashoffset', String(327 * (1 - Math.max(0, Math.min(1, li / 600)))));
+  }
+  if (trip) { const el = $('#tripT'); if (el) el.textContent = mmss((now - trip.start) / 1000); }
+  if (now - lastChip > 2000) { lastChip = now; chips(now); foot(); const b = best(now); if (b && h.dataset.key !== b.d.key) heroDraw(now); }
+  requestAnimationFrame(frame);
+}
+
+/* ---------- reminders and learning ---------- */
+async function setRemind(b) {
+  try { if ('Notification' in window && Notification.permission === 'default') await Notification.requestPermission(); } catch (e) {}
+  clearTimeout(remind);
+  const ms = Math.max(0, b.li * 1000);
+  remind = setTimeout(() => {
+    remind = null;
+    try { if (Notification.permission === 'granted') new Notification('Leave now', {body: `${b.m.label} for the ${hhmm(b.d.t)} ${shortName(b.d)} to ${b.d.dest}`}); } catch (e) {}
+    try { navigator.vibrate?.([300, 120, 300]); } catch (e) {}
+    heroDraw(Date.now());
+  }, ms);
+  heroDraw(Date.now());
+}
+function startTrip(p, m) { trip = {placeId: p.id, mode: m, start: Date.now()}; drawTrip(); }
+function drawTrip() {
+  const box = $('#tripBox');
+  if (!trip) { box.innerHTML = ''; return; }
+  const p = placeOf(trip.placeId), m = MODES.find(x => x.k === trip.mode);
+  box.innerHTML = `<div class="trip"><span>Timing your ${esc(m.label.toLowerCase())} to ${esc(p?.name)}</span><b id="tripT">0:00</b><button id="onPlat">I'm on the platform</button><button id="cancelTrip">Cancel</button></div>`;
+  $('#onPlat').addEventListener('click', endTrip);
+  $('#cancelTrip').addEventListener('click', () => { trip = null; drawTrip(); });
+}
+function endTrip() {
+  const p = cfg.places.find(q => q.id === trip.placeId);
+  if (p) {
+    let mins = (Date.now() - trip.start) / 60000 - (+p.platform || 0);
+    if (trip.mode === 'lift') mins -= cfg.liftPickup;
+    if (mins > 0.3 && mins < 120) { p.learned = p.learned || {}; const old = p.learned[trip.mode]; p.learned[trip.mode] = old == null ? mins : old * 0.7 + mins * 0.3; save(); }
+  }
+  trip = null; drawTrip(); render();
+}
+
+/* ---------- detail drawer ---------- */
+let followTimer = null;
+function openDetail(d) {
+  const p = placeOf(d.placeId), now = Date.now();
+  const sheet = $('#detailSheet');
+  const rows = modesFor(p).map(m => { const pr = chance(d, p, m.k, now), li = leaveIn(d, p, m.k, now); return `<tr><td>${m.label}</td><td>${Math.round(modeSecs(p, m.k) / 60)} min</td><td class="${cls(pr)}"><b>${Math.round(pr * 100)}%</b></td><td>${li > 0 ? 'leave in ' + mmss(li) : 'too late for 80%'}</td></tr>`; }).join('');
+  sheet.innerHTML = `<button class="close" id="dClose">Close</button><h2><span class="badge" style="display:inline-grid;height:30px;padding:0 8px;vertical-align:middle;background:${d.colour}">${esc(shortLine(d))}</span> ${esc(d.dest)}</h2>
+    <p class="note">${esc(d.platform || '')} · ${esc(p?.name || '')} · ${d.cancelled ? '<b class="x">Cancelled</b>' : 'departs ' + hhmm(d.t)} · source: ${esc(d.src)}</p>
+    <h3>Your chances</h3><table style="width:100%;border-collapse:collapse">${rows}</table>
+    <p class="note">Chance = the train and your trip are both uncertain; Catch It combines both spreads (normal curves) with a ${cfg.buffer}s safety buffer.</p>
+    ${d.coaches ? `<h3>Train length</h3><div class="coaches">${Array.from({length: d.coaches}, (_, k) => `<span>${k + 1}</span>`).join('')}</div><p class="note">${d.coaches} coaches. Per-coach busyness appears here when the operator supplies it.</p>` : ''}
+    ${d.calls?.length ? `<h3>Calling at</h3><ul class="stops">${d.calls.map(c => `<li><span>${esc(c.name)}</span><span>${esc(c.et && c.et !== 'On time' ? c.et : c.t)}</span></li>`).join('')}</ul>` : ''}
+    ${d.mode === 'bus' && d.vehicleId ? `<h3>Follow this bus <span class="note">(registration ${esc(d.vehicleId)})</span></h3><div id="follow" class="note">Loading its next stops…</div>` : ''}`;
+  $('#detail').classList.add('open');
+  $('#dClose').addEventListener('click', closeDetail);
+  if (d.mode === 'bus' && d.vehicleId) follow(d);
+}
+function closeDetail() { $('#detail').classList.remove('open'); clearInterval(followTimer); }
+$('#detail').addEventListener('click', e => { if (e.target.id === 'detail') closeDetail(); });
+async function follow(d) {
+  clearInterval(followTimer);
+  const box = $('#follow'); let stops = [];
+  const pull = async () => {
+    if (d.src === 'Demo') { stops = ['Market Place', 'High Street', 'Demo station', 'Church Road', 'Hospital'].map((n, k) => ({name: n, t: Date.now() + (k * 90 + 40) * 1000})); return; }
+    try { const a = await getJSON(TFL + '/Vehicle/' + encodeURIComponent(d.vehicleId) + '/Arrivals'); stops = a.map(x => ({name: x.stationName, t: Date.parse(x.expectedArrival)})).filter(x => x.t > Date.now() - 20000).sort((x, y) => x.t - y.t).slice(0, 14); }
+    catch (e) { box.textContent = 'Could not load this bus: ' + e.message; }
+  };
+  const draw = () => {
+    if (!stops.length) return; const now = Date.now();
+    box.innerHTML = `<ul class="stops" id="fl">${stops.map(s => `<li><span>${esc(s.name)}</span><span>${mmss((s.t - now) / 1000)}</span></li>`).join('')}</ul>`;
+    const ul = $('#fl'), lis = ul.querySelectorAll('li'); if (!lis.length) return;
+    let y = 0; const first = stops[0];
+    if (first.t > now) { const span = 120000; const f = Math.min(1, (first.t - now) / span); y = lis[0].offsetTop - f * 30; }
+    const bus = document.createElement('div'); bus.className = 'busnow'; bus.style.background = d.colour; bus.textContent = d.line; bus.style.top = Math.max(-8, y) + 'px'; ul.appendChild(bus);
+  };
+  await pull(); draw(); connections(d, stops); let n = 0;
+  followTimer = setInterval(async () => { if (++n % 20 === 0) await pull(); draw(); }, 1000);
+}
+
+function connections(d, stops) {
+  const stations = (demo ? demoPlaces : cfg.places).filter(p => !/^490/.test(p.tflId || '') && p.id !== d.placeId);
+  for (const st of stations) {
+    const word = String(st.name).split(/[ (]/)[0].toLowerCase(); if (word.length < 3) continue;
+    const hit = stops.find(s => s.name.toLowerCase().includes(word) && /station/i.test(s.name)) || stops.find(s => s.name.toLowerCase() === st.name.toLowerCase()); if (!hit) continue;
+    const trains = deps.filter(x => x.placeId === st.id && !x.cancelled && x.t > hit.t).slice(0, 5); if (!trains.length) continue;
+    const walk = (+st.platform || 2) * 60 + 90;
+    const html = `<h3>Connections at ${esc(st.name)}</h3><p class="note">This bus reaches ${esc(hit.name)} about ${hhmm(hit.t)}. Chance of then making each train (4,000 simulated trips, including bus lateness, your walk to the platform and train lateness):</p><table style="width:100%;border-collapse:collapse">${trains.map(x => { const pr = connect(hit.t, 90, walk, x); return `<tr><td>${hhmm(x.t)}</td><td>${esc(shortName(x))} to ${esc(x.dest)}</td><td class="${cls(pr)}" style="text-align:right"><b>${Math.round(pr * 100)}%</b></td></tr>`; }).join('')}</table>`;
+    const box = document.createElement('div'); box.innerHTML = html; $('#follow')?.after(box);
+  }
+}
+
+/* ---------- setup drawer ---------- */
+function openSetup() { drawSetup(); $('#setup').classList.add('open'); }
+function closeSetup() { $('#setup').classList.remove('open'); save(); demo = false; demoSeed = []; refresh(); weather(); }
+$('#setup').addEventListener('click', e => { if (e.target.id === 'setup') closeSetup(); });
+function drawSetup() {
+  const s = $('#setupSheet');
+  s.innerHTML = `<button class="close" id="sClose">Done</button><h2>Your stops and stations</h2>
+  <p class="note">Saved only in this browser. Nothing about you is sent anywhere except the stop codes needed to ask TfL and National Rail for departures.</p>
+  <div id="places">${cfg.places.map(placeCard).join('') || '<p class="note">No stops yet. Search below.</p>'}</div>
+  <h3>Add a stop or station</h3>
+  <div class="field"><label for="q">Search TfL stops and stations (bus, Elizabeth line, Tube, rail)</label><input id="q" placeholder="e.g. a station or bus stop name" autocomplete="off"></div>
+  <div class="res" id="res"></div>
+  <h3>How fast you are</h3>
+  <div class="grid2">
+    <div class="field"><label for="fRun">Running time as share of walking</label><input id="fRun" type="number" step="0.05" min="0.2" max="1" value="${cfg.f.run}"></div>
+    <div class="field"><label for="fBike">Cycling time as share of walking</label><input id="fBike" type="number" step="0.05" min="0.1" max="1" value="${cfg.f.bike}"></div>
+    <div class="field"><label for="fDrive">Driving time as share of walking</label><input id="fDrive" type="number" step="0.05" min="0.05" max="1" value="${cfg.f.drive}"></div>
+    <div class="field"><label for="lp">Lift: minutes until your friend can pick you up</label><input id="lp" type="number" min="0" max="60" value="${cfg.liftPickup}"></div>
+    <div class="field"><label for="buf">Safety buffer (seconds before departure)</label><input id="buf" type="number" min="0" max="180" value="${cfg.buffer}"></div>
+    <div class="field"><label for="win">Show departures for the next (minutes)</label><input id="win" type="number" min="10" max="120" value="${cfg.window}"></div>
+  </div>
+  <p class="note">Your learned times replace these guesses: tap "I'm going", then "I'm on the platform" when you arrive.</p>
+  <h3>Greater Anglia and other National Rail trains</h3>
+  <p class="note">TfL's feed covers buses, the Elizabeth line and the Tube. For other trains, add your free Live Departure Board key from the Rail Data Marketplace (raildata.org.uk), then add a station's three-letter code to its card. The key stays in this browser.</p>
+  <div class="field"><label for="dk">Rail Data Marketplace consumer key</label><input id="dk" type="password" value="${esc(cfg.darwinKey)}" autocomplete="off"></div>
+  <p class="note">Data: TfL Unified API (Powered by TfL Open Data), National Rail Darwin, Open-Meteo weather.</p>`;
+  $('#sClose').addEventListener('click', closeSetup);
+  const num = (id, fn) => $('#' + id).addEventListener('change', e => { const v = parseFloat(e.target.value); if (!isNaN(v)) { fn(v); save(); } });
+  num('fRun', v => cfg.f.run = v); num('fBike', v => cfg.f.bike = v); num('fDrive', v => cfg.f.drive = v);
+  num('lp', v => cfg.liftPickup = v); num('buf', v => cfg.buffer = v); num('win', v => cfg.window = v);
+  $('#dk').addEventListener('change', e => { cfg.darwinKey = e.target.value.trim(); cfg.darwinPath = ''; save(); });
+  let tq; $('#q').addEventListener('input', e => { clearTimeout(tq); tq = setTimeout(() => search(e.target.value), 350); });
+  bindPlaces();
+}
+function placeCard(p) {
+  return `<div class="place" data-id="${esc(p.id)}"><header><span>${esc(p.name)}</span><button data-del="${esc(p.id)}">Remove</button></header>
+  <div class="grid2">
+    <div class="field"><label>Walk from home (minutes)</label><input type="number" min="0" max="90" step="0.5" data-k="walk" value="${esc(p.walk)}"></div>
+    <div class="field"><label>Entrance to platform or stop (minutes)</label><input type="number" min="0" max="20" step="0.5" data-k="platform" value="${esc(p.platform)}"></div>
+    <div class="field"><label>Only show (routes, destinations or platforms, comma separated)</label><input data-k="only" value="${esc(p.only || '')}" placeholder="e.g. 103, Heathrow, Platform 4"></div>
+    <div class="field"><label>National Rail station code (optional)</label><input data-k="crs" maxlength="3" value="${esc(p.crs || '')}" placeholder="3 letters"></div>
+  </div>
+  <div class="modes">${MODES.map(m => `<label><input type="checkbox" data-mode="${m.k}" ${p.modes?.[m.k] !== false ? 'checked' : ''}>${m.label}</label>`).join('')}</div>
+  ${p.learned && Object.keys(p.learned).length ? `<p class="note">Learned: ${Object.entries(p.learned).map(([k, v]) => esc(k) + ' ' + v.toFixed(1) + ' min').join(', ')}</p>` : ''}</div>`;
+}
+function bindPlaces() {
+  document.querySelectorAll('.place').forEach(el => {
+    const p = cfg.places.find(q => q.id === el.dataset.id); if (!p) return;
+    el.querySelectorAll('[data-k]').forEach(i => i.addEventListener('change', () => { const k = i.dataset.k; p[k] = (k === 'only' || k === 'crs') ? i.value.trim() : parseFloat(i.value) || 0; save(); }));
+    el.querySelectorAll('[data-mode]').forEach(i => i.addEventListener('change', () => { p.modes = p.modes || {}; p.modes[i.dataset.mode] = i.checked; save(); }));
+    el.querySelector('[data-del]').addEventListener('click', () => { cfg.places = cfg.places.filter(q => q !== p); save(); drawSetup(); });
+  });
+}
+async function search(q) {
+  const res = $('#res'); q = q.trim(); if (q.length < 3) { res.innerHTML = ''; return; }
+  res.innerHTML = '<p class="note">Searching…</p>';
+  try {
+    const r = await getJSON(TFL + '/StopPoint/Search/' + encodeURIComponent(q) + '?modes=bus,elizabeth-line,tube,overground,dlr,national-rail,tram&maxResults=8');
+    if (!r.matches?.length) { res.innerHTML = '<p class="note">No matches.</p>'; return; }
+    res.innerHTML = r.matches.map((m, i) => `<button data-i="${i}"><b>${esc(m.name)}</b><span class="note">${esc((m.modes || []).join(', '))}</span></button>`).join('');
+    res.querySelectorAll('button').forEach(b => b.addEventListener('click', () => pick(r.matches[+b.dataset.i])));
+  } catch (e) { res.innerHTML = '<p class="err">Search failed: ' + esc(e.message) + '</p>'; }
+}
+async function pick(m) {
+  const res = $('#res');
+  if ((m.modes || []).includes('bus') && /^490G/.test(m.id)) {
+    res.innerHTML = '<p class="note">Loading the stops here…</p>';
+    try {
+      const sp = await getJSON(TFL + '/StopPoint/' + encodeURIComponent(m.id));
+      const kids = (sp.children || []).filter(c => (c.lines || []).length);
+      res.innerHTML = '<p class="note">Pick the stop on your side of the road:</p>' + kids.map((c, i) => { const tw = (c.additionalProperties || []).find(a => a.key === 'Towards')?.value || ''; return `<button data-i="${i}"><b>${esc(c.indicator || c.commonName)} · ${esc(c.commonName)}</b><span class="note">Towards ${esc(tw)} · routes ${esc(c.lines.map(l => l.name).join(', '))}</span></button>`; }).join('');
+      res.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { const c = kids[+b.dataset.i]; addPlace({name: c.commonName + ' (' + (c.indicator || '') + ')', tflId: c.naptanId, lat: c.lat, lon: c.lon, walk: 4, platform: 0.5, bus: true}); }));
+    } catch (e) { res.innerHTML = '<p class="err">' + esc(e.message) + '</p>'; }
+    return;
+  }
+  const hasTfl = (m.modes || []).some(x => ['elizabeth-line', 'tube', 'overground', 'dlr', 'tram'].includes(x));
+  addPlace({name: m.name.replace(/ (Rail|Underground) Station$/, ''), tflId: hasTfl ? m.id : '', lat: m.lat, lon: m.lon, walk: 10, platform: 2});
+}
+function addPlace(o) {
+  cfg.places.push(Object.assign({id: 'p' + Date.now().toString(36), modes: {walk: true, run: true, bike: !o.bus, lift: !o.bus}, learned: {}}, o));
+  save(); drawSetup(); $('#q')?.focus();
+}
+
+/* ---------- wiring ---------- */
+$('#setBtn').addEventListener('click', openSetup);
+const liftBtn = $('#liftBtn');
+const syncLift = () => liftBtn.setAttribute('aria-pressed', String(!!cfg.liftOn));
+liftBtn.addEventListener('click', () => { cfg.liftOn = !cfg.liftOn; save(); syncLift(); render(); });
+syncLift();
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeDetail(); if ($('#setup').classList.contains('open')) closeSetup(); } });
+let poll = null;
+const startPoll = () => { clearInterval(poll); poll = setInterval(() => { if (!document.hidden) refresh(); }, 25000); };
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+refresh(); weather(); startPoll(); setInterval(weather, 600000);
+requestAnimationFrame(frame);
+window.__catchit = {cfg: () => cfg, deps: () => deps};
+}
+</script>
+</body>
+</html>

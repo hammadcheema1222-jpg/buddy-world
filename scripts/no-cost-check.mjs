@@ -1,7 +1,7 @@
 // Guard: Buddy World must never need a paid service or a secret key.
 // Fails the build if the code contains secret-looking keys or calls paid / billed APIs.
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-const roots = ['src', 'plugins', 'live.html', 'earth.html', 'index.html'];
+const roots = ['src', 'plugins', 'live.html', 'earth.html', 'index.html', 'catch-it'];
 const files = [];
 const walk = p => { const s = statSync(p); if (s.isDirectory()) readdirSync(p).forEach(f => walk(p + '/' + f)); else if (/\.(js|html|mjs|json)$/.test(p)) files.push(p); };
 roots.forEach(r => { try { walk(r); } catch (e) {} });

@@ -15,6 +15,7 @@ history, public records about places, a science lab (shadows, floods, fire, nois
 | 🏙️ Buddy City | `city.html` (built from `src/city/`) | The main 3D city |
 | 🌍 Buddy Earth Live | `live.html` | Globe with MapLibre |
 | 🛰️ Buddy Earth | `earth.html` | Satellite + terrain flyover |
+| 🚉 Catch It | `catch-it/` | Which train or bus can I actually catch? Live departures, race strip, live map, 3D window view, station walk-through |
 
 ## Ways to help (pick your level)
 | You are… | Do this | Time |
