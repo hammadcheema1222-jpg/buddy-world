@@ -199,7 +199,7 @@ details summary{cursor:pointer;font-weight:600;margin:10px 0}
 @media(prefers-reduced-motion:reduce){.busnow{transition:none}}
 </style>
 <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="ui.css?v=1795556748">
+<link rel="stylesheet" href="ui.css?v=1795557334">
 </head>
 <body class="tabs">
 <div class="top">
@@ -743,7 +743,7 @@ function loadML() {
   return mlP || (mlP = new Promise((ok, no) => {
     const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'https://unpkg.com/maplibre-gl@5.24.1/dist/maplibre-gl.css'; document.head.appendChild(l);
     const s = document.createElement('script'); s.src = 'https://unpkg.com/maplibre-gl@5.24.1/dist/maplibre-gl.js';
-    s.onload = () => { const s2 = document.createElement('script'); s2.src = 'mapstyle.js?v=1795555058'; s2.onload = ok; s2.onerror = no; document.head.appendChild(s2); }; s.onerror = no; document.head.appendChild(s);
+    s.onload = () => { const s2 = document.createElement('script'); s2.src = 'mapstyle.js?v=1795557334'; s2.onload = ok; s2.onerror = no; document.head.appendChild(s2); }; s.onerror = no; document.head.appendChild(s);
   }));
 }
 const EMPTY = {type: 'FeatureCollection', features: []};

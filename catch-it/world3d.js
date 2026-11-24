@@ -205,7 +205,10 @@
       }
     }
     try { for (const f of m.querySourceFeatures('omt', {sourceLayer: 'landcover', filter: ['==', ['get', 'class'], 'wood']})) { const c = f.geometry.type === 'Polygon' ? f.geometry.coordinates[0] : null; if (c && els.length < 20000) els.push({type: 'way', id: id++, tags: {landuse: 'forest'}, geometry: c.map(q => ({lon: q[0], lat: q[1]}))}); } } catch (e) {}
-    return els.length ? {elements: els} : null;
+    // keep the 1,500 buildings nearest the centre (plus woods): fast on phones, detail where you're looking
+    const ctr = [c.lng, c.lat], d2 = e => { const g = e.geometry || e.members?.[0]?.geometry; if (!g || !g[0]) return 1e9; return (g[0].lon - ctr[0]) ** 2 * Math.cos(c.lat * Math.PI / 180) ** 2 + (g[0].lat - ctr[1]) ** 2; };
+    const bld = els.filter(e => e.tags.building).sort((a, b) => d2(a) - d2(b)).slice(0, innerWidth < 700 ? 900 : 1500), rest = els.filter(e => !e.tags.building);
+    return bld.length || rest.length ? {elements: bld.concat(rest)} : null;
   }
   async function overpass(q) {
     for (const host of ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter']) {
@@ -227,7 +230,7 @@
     if (z < 14.8 || busy || (loadedAt && hav(loadedAt, here) < 450)) return;
     if (!m.isSourceLoaded('omt')) { clearTimeout(W._t); W._t = setTimeout(W.update, 700); return; }   // map never goes idle while vehicles animate, so poll until the tiles here arrive
     busy = true; W.status = 'Loading real buildings…'; CI.onStatus?.();
-    const dLat = 0.0072, dLon = dLat / Math.cos(c.lat * DEG), bb = [c.lat - dLat, c.lng - dLon, c.lat + dLat, c.lng + dLon].map(v => v.toFixed(5)).join(',');
+    const dLat = 0.0055, dLon = dLat / Math.cos(c.lat * DEG), bb = [c.lat - dLat, c.lng - dLon, c.lat + dLat, c.lng + dLon].map(v => v.toFixed(5)).join(',');
     const q = `[out:json][timeout:40];(way["building"](${bb});relation["building"]["type"="multipolygon"](${bb});way["building:part"](${bb});relation["building:part"](${bb});node["natural"="tree"](${bb});way["landuse"="forest"](${bb});way["natural"="wood"](${bb});node["man_made"~"^(mast|tower|chimney)$"](${bb}););out geom;`;
     const swap = g => { if (group) { three.scene.remove(group); group.traverse(o => o.geometry && o.geometry.dispose()); } group = g; three.scene.add(group); loadedAt = here; W.blocks(m, false); m.triggerRepaint(); };
     const tiles = fromTiles(CI, c, dLat * 1.3, dLon * 1.3);
