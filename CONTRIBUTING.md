@@ -29,6 +29,7 @@ Never edit `city.html` directly: it is generated and your change would be overwr
 ## Rules
 - **Open data only**, with its licence and a credit in the card or `assets/CREDITS.md`
 - **No personal data about private people**: no names, phone numbers, home addresses, photos of people from social media, or anything that helps track someone. Places, events, organisations and public officials in their public role are fine.
+- **Free services only, no billing.** Buddy World must cost nothing to run: no paid APIs, no services that need a credit card. The automatic check blocks them (see [SECURITY.md](SECURITY.md)).
 - **No API secrets in the code.** If a source needs a key, let the user paste their own (stored only in their browser), like the Adzuna jobs key.
 - **Phones first**: keep it light (no huge downloads without asking), large tap targets.
 - **Be kind**: see [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).

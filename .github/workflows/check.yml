@@ -4,13 +4,21 @@ on:
   push:
     branches: [main]
     paths: ['src/**', 'plugins/**', 'build.mjs']
+permissions:
+  contents: read
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: {node-version: 20}
+      - name: No-cost policy (no paid APIs, no secret keys)
+        run: node scripts/no-cost-check.mjs
       - name: Syntax check of the app and every plugin
         run: node build.mjs --check
       - name: city.html is up to date with src/city
