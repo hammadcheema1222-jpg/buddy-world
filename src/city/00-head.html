@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Buddy City — real cities built from OpenStreetMap</title>
 <style>
 html,body{margin:0;height:100%;background:#9fc9e6;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;font-family:Georgia,'Times New Roman',serif;color:#3d2c17}
@@ -31,7 +31,7 @@ h1{font-size:26px;margin:0 0 4px}h3{margin:12px 0 2px;font-size:17px}p{margin:4p
 #info .card{max-width:min(560px,94vw)}#iBody div{margin:3px 0;font-size:15px}#iBody b{display:inline-block;min-width:110px;color:#6b4f2e}
 #iImg img{width:100%;max-height:300px;object-fit:cover;border-radius:10px;border:2px solid #6b4f2e;margin:8px 0}#iWiki{font-size:14px;line-height:1.5;margin-top:6px}
 </style></head><body>
-<canvas id="c"></canvas>
+<canvas id="c" role="img" aria-label="3D map of the selected place. Use the buttons, the Nearby list or the keyboard to explore."></canvas>
 <div id="hud" class="paper"><div id="place">🏙️ Buddy City</div><div id="clock"></div><div id="wx" style="font-size:12px"></div><div id="coords"></div></div>
 <div id="top" class="paper"><button id="bPlaces">🔍 Places</button><button id="bLayers">🧭 Layers</button><button id="mWalk">🚶 Walk</button><button id="mFly">✈️ Fly</button><button id="mMap" class="on">🗺️ Overview</button><button id="bKind">🐼 Panda</button><button id="bFs">⛶</button></div>
 <div id="timebar" class="paper"><span>☀️ Time</span><input type="range" id="tSlider" min="0" max="23.9" step="0.1" value="12"><button id="tLive" class="on">Live</button><span style="margin-left:10px">🏛️ History</span><input type="range" id="yr" min="1800" max="2026" step="1" value="2026"><span id="yrL">Now</span><button id="yPlay">▶</button></div>
