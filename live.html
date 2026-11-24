@@ -220,4 +220,15 @@ function frame(now){requestAnimationFrame(frame);if(!last)last=now;const dt=Math
  map.triggerRepaint();}
 buildPet();requestAnimationFrame(frame);setFollow(false);$('joy').style.display='none';
 }
+</script>
+<script>
+/* Auto-start: no place picker. Current location (if allowed) → last place → random spot nearby */
+(async function(){const st=document.getElementById('start');if(!st)return;st.style.display='none';
+ const sget=k=>{try{return JSON.parse(localStorage.getItem(k)||'null');}catch(e){return null;}};
+ const here=()=>new Promise(res=>{if(!navigator.geolocation)return res(null);navigator.geolocation.getCurrentPosition(p=>res(p.coords),()=>res(null),{enableHighAccuracy:true,timeout:8000,maximumAge:300000});});
+ let granted=false;try{granted=(await navigator.permissions.query({name:'geolocation'})).state!=='denied';}catch(e){granted=true;}
+ const pos=granted?await here():null;const last=sget('bw.last');
+ if(pos){goTo('📍 Where I am',pos.latitude,pos.longitude,16.5);return;}
+ if(last&&last.lat!=null){goTo(last.name,last.lat,last.lon,16);return;}
+ const near=PRESETS.filter(x=>/London/.test(x[0]));const p=(near.length?near:PRESETS)[Math.floor(Math.random()*(near.length||PRESETS.length))];goTo(p[0],p[1],p[2],p[3]);})();
 </script></body></html>

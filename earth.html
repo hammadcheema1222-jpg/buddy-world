@@ -293,4 +293,15 @@ function frame(now){requestAnimationFrame(frame);if(!last)last=now;const dt=Math
 buildPet();pet.root.visible=true;updateSky();requestAnimationFrame(frame);
 
 }
+</script>
+<script>
+/* Auto-start: no place picker. Current location (if allowed) → last place → random spot nearby */
+(async function(){const st=document.getElementById('start');if(!st)return;st.style.display='none';
+ const sget=k=>{try{return JSON.parse(localStorage.getItem(k)||'null');}catch(e){return null;}};
+ const here=()=>new Promise(res=>{if(!navigator.geolocation)return res(null);navigator.geolocation.getCurrentPosition(p=>res(p.coords),()=>res(null),{enableHighAccuracy:true,timeout:8000,maximumAge:300000});});
+ let granted=false;try{granted=(await navigator.permissions.query({name:'geolocation'})).state!=='denied';}catch(e){granted=true;}
+ const pos=granted?await here():null;const last=sget('bw.last');
+ if(pos){goTo({n:'📍 Where I am',lat:pos.latitude,lon:pos.longitude,m:'city',back:250});return;}
+ if(last&&last.lat!=null){goTo({n:last.name,lat:last.lat,lon:last.lon,m:'city',back:250});return;}
+ const near=PRESETS.filter(x=>/London/.test(x.n));const L=near.length?near:PRESETS;goTo(L[Math.floor(Math.random()*L.length)]);})();
 </script></body></html>

@@ -1802,10 +1802,14 @@ function restoreView(){const v=sget2('bw.view');if(!v||Math.abs(v.lat-O.lat)>1e-
 
 /* ---------- 2. Open straight into the map: last place → your GPS location → London ---------- */
 async function autoStart(){const qs=new URLSearchParams(location.search);if(qs.get('lat'))return;$('start').style.display='none';const last=sget2('bw.last');
- if(last&&last.lat!=null){if(last.R)$('size').value=last.R;_goTo13(last.name,last.lat,last.lon,last.cc);return;}
- status('📍 Finding where you are…');const pos=await new Promise(res=>{if(!navigator.geolocation)return res(null);navigator.geolocation.getCurrentPosition(p=>res(p),()=>res(null),{enableHighAccuracy:true,timeout:9000,maximumAge:600000});});
+ // current location first (no prompt if already allowed), then the last place, then a random spot nearby
+ let state='prompt';try{state=(await navigator.permissions.query({name:'geolocation'})).state;}catch(e){}
+ const getPos=()=>new Promise(res=>{if(!navigator.geolocation)return res(null);navigator.geolocation.getCurrentPosition(p=>res(p),()=>res(null),{enableHighAccuracy:true,timeout:8000,maximumAge:300000});});
+ let pos=null;if(state==='granted'||(!last&&state!=='denied')){status('📍 Finding where you are…');pos=await getPos();}
  if(pos){const la=pos.coords.latitude,lo=pos.coords.longitude;let cc='',nm='Where I am';try{const j=await jget(`https://nominatim.openstreetmap.org/reverse?format=json&zoom=16&addressdetails=1&lat=${la}&lon=${lo}`);const a=j.address||{};cc=a.country_code||'';nm=a.road||a.suburb||a.town||a.city||nm;}catch(e){}goTo('📍 '+nm,la,lo,cc);return;}
- goTo('🇬🇧 Westminster & Big Ben, London',51.5007,-0.1246,'gb');}
+ if(last&&last.lat!=null){if(last.R)$('size').value=last.R;_goTo13(last.name,last.lat,last.lon,last.cc);return;}
+ const SPOTS=[['🇬🇧 Westminster & Big Ben, London',51.5007,-0.1246],['🇬🇧 Covent Garden, London',51.5117,-0.1240],['🇬🇧 Camden Market, London',51.5413,-0.1460],['🇬🇧 Greenwich, London',51.4826,-0.0077],['🇬🇧 Tower Bridge, London',51.5055,-0.0754],['🇬🇧 Notting Hill, London',51.5096,-0.1963],['🇬🇧 Canary Wharf, London',51.5054,-0.0235]];
+ const s=SPOTS[Math.floor(Math.random()*SPOTS.length)];goTo(s[0],s[1],s[2],'gb');}
 setTimeout(autoStart,50);
 const _after13=afterCityLoaded;afterCityLoaded=function(){_after13();restoreView();if(isLondon())['livebus','transit','cams'].forEach(k=>{if(!LAY[k]){LAY[k]=true;applyLayer(k);}});};
 
