@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#14162b">
+<meta name="theme-color" content="#E4E6E3">
 <title>Catch It · Live Map</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='11' fill='none' stroke='%236950a1' stroke-width='6'/%3E%3Crect x='1' y='13' width='30' height='6' fill='%23c8102e'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -61,6 +61,8 @@ details summary{cursor:pointer;font-weight:600;font-size:14px;margin:8px 0}
 .grab{display:none}
 @media(max-width:700px){.panel{top:auto;bottom:0;left:0;width:100%;max-height:52%;border-radius:16px 16px 0 0}.panel.min{max-height:168px;overflow:hidden}.grab{display:block;width:100%;min-height:24px;border:0;background:none;padding:0}.grab::before{content:"";display:block;width:44px;height:5px;border-radius:3px;background:var(--line);margin:0 auto}nav a{padding:8px}.logo span{display:none}}
 </style>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;700;800&family=Doto:wght@700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="ui.css">
 </head>
 <body>
 <div class="top"><a class="logo" href="./"><i></i><span>Catch It</span></a>
@@ -523,6 +525,7 @@ async function poll() {
 }
 map.once('load', init);
 $('#grab').addEventListener('click', () => $('#panel').classList.toggle('min'));
+if (!gKey()) { document.querySelector('.seg [data-v=real]')?.remove(); document.querySelector('.seg').style.gridTemplateColumns = 'repeat(3,1fr)'; }   // photo-real stays hidden until a Google key is added in 3D options
 $('#gkSave').addEventListener('click', () => { const k = $('#gk').value.trim(); if (!/^AIza[\w-]{30,}$/.test(k)) { $('#gk').setCustomValidity('That does not look like a Google API key'); $('#gk').reportValidity(); return; } cfg.gKey = k; try { const all = JSON.parse(localStorage.getItem('catchit.v1') || '{}'); all.gKey = k; localStorage.setItem('catchit.v1', JSON.stringify(all)); } catch (e) {} setView('real'); });
 $('#gk').addEventListener('input', () => $('#gk').setCustomValidity(''));
 $('#gkNo').addEventListener('click', () => { $('#gkBox').hidden = true; });
