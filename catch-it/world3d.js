@@ -174,12 +174,48 @@
     if (moved) CI.map.triggerRepaint();
   }
   W.reground = reground;
+  /* instant buildings from the vector map tiles already on screen (no extra server).
+     Tiles give real footprints and heights but no roof tags, so roofs are inferred from geometry:
+     circularity C = 4πA/P² near 1 on a big footprint → dome (the O2); small low footprints → pitched house roofs. */
+  function fromTiles(CI, c, dLat, dLon) {
+    const m = CI.map, els = []; let id = 1;
+    let fs = []; try { fs = m.querySourceFeatures('omt', {sourceLayer: 'building'}); } catch (e) { return null; }
+    const seen = new Set();
+    for (const f of fs) {
+      const g = f.geometry, polys = g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
+      for (const poly of polys) {
+        const outer = poly[0]; if (!outer || outer.length < 4 || Math.abs(outer[0][1] - c.lat) > dLat || Math.abs(outer[0][0] - c.lng) > dLon) continue;
+        const key = outer.length + ':' + outer[0][0].toFixed(6) + ',' + outer[0][1].toFixed(6); if (seen.has(key)) continue; seen.add(key);
+        const xy = outer.map(q => { const v = CI.local(q, 0); return [v.x, v.z]; });
+        let A = 0, P = 0; for (let i = 1; i < xy.length; i++) { A += xy[i - 1][0] * xy[i][1] - xy[i][0] * xy[i - 1][1]; P += Math.hypot(xy[i][0] - xy[i - 1][0], xy[i][1] - xy[i - 1][1]); }
+        A = Math.abs(A) / 2; const C = P ? 4 * Math.PI * A / (P * P) : 0;
+        // radial evenness: spread of edge distances from the centre (coefficient of variation); a dome stays low even with bumps on its edge
+        const cx = xy.reduce((s, q) => s + q[0], 0) / xy.length, cz = xy.reduce((s, q) => s + q[1], 0) / xy.length, rr = xy.map(q => Math.hypot(q[0] - cx, q[1] - cz));
+        const rm = rr.reduce((s, r) => s + r, 0) / rr.length, cv = Math.sqrt(rr.reduce((s, r) => s + (r - rm) ** 2, 0) / rr.length) / (rm || 1);
+        const h = +f.properties.render_height || 8, minH = +f.properties.render_min_height || 0;
+        const tags = {height: String(h)}; if (minH) tags.min_height = String(minH);
+        if (f.properties.colour) tags['building:colour'] = f.properties.colour;
+        if ((C > 0.82 && A > 1500) || (cv < 0.1 && A > 5000 && xy.length > 16)) { tags.building = 'yes'; tags['roof:shape'] = 'dome'; tags['roof:height'] = String(Math.min(Math.sqrt(A / Math.PI) * 0.45, h * 0.75)); }
+        else if (h >= 45) tags.building = 'office';
+        else if (h <= 12 && A < 260) tags.building = A < 110 ? 'terrace' : 'house';
+        else if (A > 3000 && h < 16) tags.building = 'industrial';
+        else tags.building = h > 12 ? 'apartments' : 'residential';
+        const ring = r => r.map(q => ({lon: q[0], lat: q[1]}));
+        els.push(poly.length > 1 ? {type: 'relation', id: id++, tags, members: [{type: 'way', role: 'outer', geometry: ring(outer)}, ...poly.slice(1).map(hh => ({type: 'way', role: 'inner', geometry: ring(hh)}))]} : {type: 'way', id: id++, tags, geometry: ring(outer)});
+      }
+    }
+    try { for (const f of m.querySourceFeatures('omt', {sourceLayer: 'landcover', filter: ['==', ['get', 'class'], 'wood']})) { const c = f.geometry.type === 'Polygon' ? f.geometry.coordinates[0] : null; if (c && els.length < 20000) els.push({type: 'way', id: id++, tags: {landuse: 'forest'}, geometry: c.map(q => ({lon: q[0], lat: q[1]}))}); } } catch (e) {}
+    return els.length ? {elements: els} : null;
+  }
   async function overpass(q) {
     for (const host of ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter']) {
-      try { const r = await fetch(host, {method: 'POST', body: 'data=' + encodeURIComponent(q), headers: {'Content-Type': 'application/x-www-form-urlencoded'}, signal: AbortSignal.timeout(40000)}); if (r.ok) return r.json(); } catch (e) {}
+      try { const r = await fetch(host, {method: 'POST', body: 'data=' + encodeURIComponent(q), headers: {'Content-Type': 'application/x-www-form-urlencoded'}, signal: AbortSignal.timeout(20000)}); if (r.ok) return r.json(); } catch (e) {}
     }
     throw new Error('OpenStreetMap server busy');
   }
+  let req = 0;
+  // hide the simple blocks by opacity, not zoom range: a layer outside its zoom range stops loading the building shapes we read from the tiles
+  W.blocks = (m, show) => { try { m.setPaintProperty('bld', 'fill-extrusion-opacity', show ? 1 : ['step', ['zoom'], 1, 14.8, 0]); } catch (e) {} };
   W.attach = t => { three = t; if (!mats) mats = makeMats(); loadedAt = null; group = null; W.update(); };
   W.detach = () => { three = null; group = null; };
   W.night = isNight => { if (mats && isNight !== lastNight) { lastNight = isNight; mats.wall.emissiveIntensity = isNight ? 0.55 : 0; } };
@@ -187,19 +223,24 @@
     const CI = window.CI; if (!three || !CI || !W.on) { if (group) group.visible = W.on; return; }
     const m = CI.map, z = m.getZoom(), c = m.getCenter(), here = [c.lng, c.lat];
     if (group) group.visible = z >= 14.8;
-    try { m.setLayerZoomRange('bld', 14, group ? 14.8 : 24); } catch (e) {}
+    W.blocks(m, !group);
     if (z < 14.8 || busy || (loadedAt && hav(loadedAt, here) < 450)) return;
+    if (!m.isSourceLoaded('omt')) { clearTimeout(W._t); W._t = setTimeout(W.update, 700); return; }   // map never goes idle while vehicles animate, so poll until the tiles here arrive
     busy = true; W.status = 'Loading real buildings…'; CI.onStatus?.();
     const dLat = 0.0072, dLon = dLat / Math.cos(c.lat * DEG), bb = [c.lat - dLat, c.lng - dLon, c.lat + dLat, c.lng + dLon].map(v => v.toFixed(5)).join(',');
     const q = `[out:json][timeout:40];(way["building"](${bb});relation["building"]["type"="multipolygon"](${bb});way["building:part"](${bb});relation["building:part"](${bb});node["natural"="tree"](${bb});way["landuse"="forest"](${bb});way["natural"="wood"](${bb});node["man_made"~"^(mast|tower|chimney)$"](${bb}););out geom;`;
-    try {
-      const data = await overpass(q); if (!three) return;
-      const g = build(data, CI);
-      if (group) { three.scene.remove(group); group.traverse(o => o.geometry && o.geometry.dispose()); }
-      group = g; three.scene.add(group); loadedAt = here;
-      try { m.setLayerZoomRange('bld', 14, 14.8); } catch (e) {}
-    } catch (e) { W.status = e.message + ', using simple buildings'; }
+    const swap = g => { if (group) { three.scene.remove(group); group.traverse(o => o.geometry && o.geometry.dispose()); } group = g; three.scene.add(group); loadedAt = here; W.blocks(m, false); m.triggerRepaint(); };
+    const tiles = fromTiles(CI, c, dLat * 1.3, dLon * 1.3);
+    const nb = tiles ? tiles.elements.filter(e => e.tags.building).length : 0;
+    if (!nb && (W._tries = (W._key === here.join() ? W._tries : 0) + 1) < 8) { W._key = here.join(); busy = false; clearTimeout(W._t); W._t = setTimeout(W.update, 900); return; }   // tiles still decoding: try again shortly           // 1) instant: from the map tiles
+    if (tiles) { swap(build(tiles, CI)); W.status = W.status.replace('from OpenStreetMap', 'from map tiles') + ' · adding roofs and trees…'; CI.onStatus?.(); }
     busy = false; CI.onStatus?.(); m.triggerRepaint();
+    const my = ++req;                       // 2) detail in the background: real roof shapes, parts, trees and masts from OpenStreetMap
+    try {
+      const data = await overpass(q); if (!three || my !== req) return;
+      if (hav(here, [m.getCenter().lng, m.getCenter().lat]) < 900) swap(build(data, CI));
+    } catch (e) { if (my !== req) return; W.status = tiles ? W.status.replace(' · adding roofs and trees…', ' (OpenStreetMap busy, so roofs are estimated)') : e.message + ', using simple buildings'; }
+    CI.onStatus?.(); m.triggerRepaint();
   };
   W.build = build;  // exposed for testing
   window.World3D = W;

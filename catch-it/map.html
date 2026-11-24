@@ -529,7 +529,7 @@ $('#gkNo').addEventListener('click', () => { $('#gkBox').hidden = true; });
 $('#gkEdit').addEventListener('click', () => { $('#gk').value = cfg.gKey || ''; $('#gkBox').hidden = false; });
 $('#exag').value = cfg.exag || 1; $('#exT').textContent = (+$('#exag').value).toFixed(1);
 $('#exag').addEventListener('input', e => { cfg.exag = +e.target.value; $('#exT').textContent = cfg.exag.toFixed(1); try { if (map.getTerrain()) map.setTerrain({source: 'dem', exaggeration: cfg.exag}); } catch (er) {} save(); });
-$('#realB').addEventListener('change', e => { if (window.World3D) { window.World3D.on = e.target.checked; if (!e.target.checked) { try { map.setLayerZoomRange('bld', 14, 24); } catch (er) {} } window.World3D.update(); map.triggerRepaint(); } });
+$('#realB').addEventListener('change', e => { if (window.World3D) { window.World3D.on = e.target.checked; if (!e.target.checked) { window.World3D.blocks(map, true); } window.World3D.update(); map.triggerRepaint(); } });
 let gt; $('#go').addEventListener('input', e => { clearTimeout(gt); gt = setTimeout(() => goSearch(e.target.value), 450); });
 async function goSearch(q) {
   q = q.trim(); if (q.length < 3) { $('#goRes').innerHTML = ''; return; }
