@@ -199,7 +199,7 @@ details summary{cursor:pointer;font-weight:600;margin:10px 0}
 @media(prefers-reduced-motion:reduce){.busnow{transition:none}}
 </style>
 <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="ui.css?v=1795556114">
+<link rel="stylesheet" href="ui.css?v=1795556423">
 </head>
 <body class="tabs">
 <div class="top">
@@ -222,7 +222,7 @@ details summary{cursor:pointer;font-weight:600;margin:10px 0}
   <p class="sum" id="sum"></p>
   <div class="strip" id="strip" aria-hidden="true"></div>
   <section id="hero" class="call calm" aria-live="polite"></section>
-  <div class="zone" id="zone" hidden><div id="zmap" role="img" aria-label="Catch zone map: how far from the station you could be and still make this departure"></div><p class="zcap" id="zcap"></p><p class="mcred">Map © OpenFreeMap, © OpenStreetMap contributors</p></div>
+  <div class="zone" id="zone" hidden><div class="ztabs" role="group" aria-label="Map type"><button data-z="rings" aria-pressed="true">Catch rings</button><button data-z="soon" aria-pressed="false">Soonest stop</button></div><div id="zmap" role="img" aria-label="Catch zone map: how far from the station you could be and still make this departure"></div><p class="zcap" id="zcap"></p><p class="mcred">Map © OpenFreeMap, © OpenStreetMap contributors</p></div>
   <div id="tripBox"></div>
   <div id="modesBox"><p class="lbl">How you can get there today</p><div class="modes" id="modes"></div></div>
   <p class="lbl" id="boardLbl">Everything you can catch</p>
@@ -248,7 +248,7 @@ const MODES = [
   {k:'lift', label:'Lift', short:'L', col:'#8a3fc7'}
 ];
 const LINE_COL = {elizabeth:'#6950a1','elizabeth-line':'#6950a1',bus:'#c8102e',central:'#dc241f',jubilee:'#7b868c',district:'#00782a',hammersmith:'#f589a6',circle:'#d4a900',metropolitan:'#9b0058',northern:'#1c1c1c',piccadilly:'#0019a8',victoria:'#0098d4',bakerloo:'#b36305','waterloo-city':'#4bb5a7',dlr:'#00a4a7',overground:'#ee7c0e',tram:'#5fb526',LE:'#d70428',XR:'#6950a1'};
-const DEFAULT = {places:[], f:{run:0.55, bike:0.4, drive:0.3}, liftPickup:5, liftOn:false, buffer:30, window:40, darwinKey:'', darwinPath:'', want:0.8};
+const DEFAULT = {kg:70, hourValue:12.71, places:[], f:{run:0.55, bike:0.4, drive:0.3}, liftPickup:5, liftOn:false, buffer:30, window:40, darwinKey:'', darwinPath:'', want:0.8};
 const $ = s => document.querySelector(s);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const load = () => { try { return Object.assign(structuredClone(DEFAULT), JSON.parse(localStorage.getItem('catchit.v1') || '{}')); } catch (e) { return structuredClone(DEFAULT); } };
@@ -272,6 +272,7 @@ function modeSecs(p, m) {
   else if (m === 'run') mins = L.run ?? W * F.run;
   else if (m === 'bike') mins = L.bike ?? W * F.bike;
   else mins = cfg.liftPickup + (L.lift ?? W * F.drive);
+  if (m !== 'lift') mins *= phys(p, m, mins).f;
   const wet = (m !== 'lift' && wx.rain > 0.2) ? 1.08 : 1;
   return (mins * wet + (+p.platform || 0)) * 60;
 }
@@ -388,9 +389,55 @@ async function refresh() {
 async function weather() {
   const p = cfg.places.find(q => q.lat); if (!p || demo) return;
   try {
-    const w = await getJSON('https://api.open-meteo.com/v1/forecast?latitude=' + p.lat + '&longitude=' + p.lon + '&current=precipitation,temperature_2m,wind_speed_10m');
-    wx = {rain: w.current.precipitation, temp: w.current.temperature_2m, wind: w.current.wind_speed_10m};
+    const w = await getJSON('https://api.open-meteo.com/v1/forecast?latitude=' + p.lat + '&longitude=' + p.lon + '&current=precipitation,temperature_2m,wind_speed_10m,wind_direction_10m');
+    wx = {rain: w.current.precipitation, temp: w.current.temperature_2m, wind: w.current.wind_speed_10m, wdir: w.current.wind_direction_10m};
   } catch (e) {}
+  // height of each stop above home (Open-Meteo elevation, 90 m DEM) for the hill model
+  const need = cfg.home ? cfg.places.filter(q => q.lat && q.dz == null) : [];
+  if (need.length) try {
+    const pts = [[cfg.home[1], cfg.home[0]], ...need.map(q => [q.lat, q.lon])];
+    const r = await getJSON(`https://api.open-meteo.com/v1/elevation?latitude=${pts.map(x => x[0].toFixed(5)).join(',')}&longitude=${pts.map(x => x[1].toFixed(5)).join(',')}`);
+    need.forEach((q, i) => { q.dz = +(r.elevation[i + 1] - r.elevation[0]).toFixed(1); }); save();
+  } catch (e) {}
+}
+
+/* ---------- physics of getting there ----------
+   wind: hold your effort (power) fixed and solve  c·v + ½ρ·CdA·(v + w)²·v = P0  for v, where w is the headwind
+         component along your way (wind speed × cos(wind-from − your bearing)); ρ = 1.225 kg/m³.
+   hills: walking and running follow Tobler's hiking function  v ∝ e^(−3.5·|grade + 0.05|);
+         cycling adds the climbing force m·g·grade to the same power balance.
+   tiredness (running): Riegel  T₂ = T₁·(D₂/D₁)^1.06, measured from a 400 m dash. */
+const PHY = {walk: {c: 140, A: 0.24}, run: {c: 266, A: 0.24}, bike: {c: 8, A: 0.4}};  // c: walk/run metabolic cost (N), bike rolling + drivetrain
+function solveV(m, v0, w, grade) {
+  const k = PHY[m], half = 0.5 * 1.225 * k.A, mg = (cfg.kg + (m === 'bike' ? 12 : 0)) * 9.81;
+  const P0 = k.c * v0 + half * v0 ** 3, f = v => (k.c + (m === 'bike' ? mg * grade : 0)) * v + half * (v + w) ** 2 * v - P0;
+  let lo = 0.05, hi = v0 * 3; for (let i = 0; i < 40; i++) { const mid = (lo + hi) / 2; if (f(mid) > 0) hi = mid; else lo = mid; } return (lo + hi) / 2;
+}
+const tobler = g => Math.exp(-3.5 * Math.abs(g + 0.05)) / Math.exp(-3.5 * 0.05);
+function headwind(bearingDeg) { if (wx.wind == null || wx.wdir == null) return 0; return wx.wind / 3.6 * Math.cos((wx.wdir - bearingDeg) * Math.PI / 180); }
+const brgTo = (a, b) => { const r = Math.PI / 180, y = Math.sin((b[0] - a[0]) * r) * Math.cos(b[1] * r), x = Math.cos(a[1] * r) * Math.sin(b[1] * r) - Math.sin(a[1] * r) * Math.cos(b[1] * r) * Math.cos((b[0] - a[0]) * r); return (Math.atan2(y, x) / r + 360) % 360; };
+const physCache = new Map();
+function phys(p, m, baseMins) { const k = [p.id, m, baseMins.toFixed(2), wx.wind, wx.wdir, p.dz, cfg.kg].join('|'); let r = physCache.get(k); if (!r) { r = phys0(p, m, baseMins); if (physCache.size > 500) physCache.clear(); physCache.set(k, r); } return r; }
+function phys0(p, m, baseMins) {      // returns {f: time multiplier, w: headwind m/s, g: grade, D: metres}
+  if (m === 'lift' || !cfg.home || !p.lat || !baseMins) return {f: 1};
+  const st = [p.lon, p.lat], D = havM(cfg.home, st) * DETOUR; if (D < 60) return {f: 1};
+  const v0 = D / (baseMins * 60), w = headwind(brgTo(cfg.home, st)), g = p.dz != null ? p.dz / D : 0;
+  // effort is set by a typical speed for the mode (walk 1.4, run 3.3, bike 5.5 m/s); we only use the ratio calm ÷ today,
+  // so your own measured times stay the base and the conditions scale them
+  const vt = {walk: 1.4, run: 3.3, bike: 5.5}[m];
+  let f = 1;
+  if (m === 'bike') f = vt / solveV('bike', vt, w, g);
+  else f = (vt / solveV(m, vt, w, 0)) / tobler(g);
+  if (m === 'run' && !(p.learned || {}).run) f *= Math.max(1, D / 400) ** 0.06;
+  return {f: Math.max(0.6, Math.min(1.8, f)), w, g, D};
+}
+function physNote(p, m) {
+  const r = phys(p, m, (+p.walk || 0) * (m === 'run' ? cfg.f.run : m === 'bike' ? cfg.f.bike : 1)); if (!r.D) return '';
+  const bits = []; const pct = Math.round((r.f - 1) * 100);
+  if (Math.abs(r.w) * 3.6 >= 8) bits.push(`${r.w > 0 ? 'headwind' : 'tailwind'} ${Math.round(Math.abs(r.w) * 3.6)} km/h`);
+  if (Math.abs(r.g) >= 0.008) bits.push(`${r.g > 0 ? 'uphill' : 'downhill'} ${(Math.abs(r.g) * 100).toFixed(1)}%`);
+  if (!bits.length || Math.abs(pct) < 2) return '';
+  return `${bits.join(' and ')} on the way, so ${({walk: 'walking', run: 'running', bike: 'cycling'})[m]} is about ${Math.abs(pct)}% ${pct > 0 ? 'slower' : 'faster'} right now.`;
 }
 
 /* ---------- demo (clearly labelled) ---------- */
@@ -424,6 +471,7 @@ function drawSummary(now) {
   if (!deps.length) { el.textContent = ''; st.innerHTML = ''; st.hidden = true; return; }
   const L = nextHour(now), ok = L.filter(x => x.v.cls === 'g' || x.v.cls === 'a'), b = best(now);
   el.innerHTML = ok.length && b ? `<b>Next hour:</b> ${ok.length} ${ok.length === 1 ? 'departure' : 'departures'} you can still catch. The best is the ${hhmm(b.d.t)} ${esc(shortName(b.d))}${b.m.k !== 'walk' ? ' if you ' + verbOf(b.m.k) : ''}.` : '<b>Next hour:</b> nothing you can still catch from here. Try Where to? for another way.';
+  if (b) { const pn = physNote(b.p, b.m.k); if (pn) el.innerHTML += `<br><span class="phys">${esc(pn)}</span>`; }
   st.hidden = false;
   if (!st.dataset.built) { st.dataset.built = '1'; st.innerHTML = '<i class="sl"></i>' + [0, 15, 30, 45, 60].map(m => `<span class="sx" style="left:${m / 60 * 100}%">${m ? m + ' min' : 'now'}</span>`).join('') + '<div class="sm" id="sm"></div>'; }
   const sm = $('#sm'), have = new Set();
@@ -445,10 +493,40 @@ function best(now) {
   return pick || fallback;
 }
 
+/* ---------- learning how each train really behaves ----------
+   for every departure we remember the first time it was shown 8+ min ahead and the time it really left;
+   drift = real − first shown. Stats per stop/line/weekday-or-weekend/hour use Welford's running mean and variance,
+   then shrink toward 0 with a prior worth 3 sightings: estimate = n·mean / (n + 3). Darwin trains also log lateness vs timetable. */
+let obs = {}; try { obs = JSON.parse(sessionStorage.getItem('catchit.obs') || '{}'); } catch (e) {}
+const bucketOf = d => { const t = new Date(d.t); return `${d.placeId}|${d.lineId}|${t.getDay() % 6 ? 'wd' : 'we'}|${t.getHours()}`; };
+function welford(s, x) { s.n = (s.n || 0) + 1; const dl = x - (s.mean || 0); s.mean = (s.mean || 0) + dl / s.n; s.m2 = (s.m2 || 0) + dl * (x - s.mean); return s; }
+function learnTrains(now) {
+  if (demo) return; cfg.learnT = cfg.learnT || {};
+  for (const d of deps) {
+    if (d.cancelled) continue; const o = obs[d.key] = obs[d.key] || {};
+    if (o.first == null && d.t - now > 8 * 60e3) o.first = d.t;
+    if (!o.done && d.t - now < 60e3 && d.t - now > -120e3) {
+      o.done = true; const s = cfg.learnT[bucketOf(d)] = cfg.learnT[bucketOf(d)] || {};
+      if (o.first != null) s.drift = welford(s.drift || {}, (d.t - o.first) / 60000);
+      if (d.std) s.late = welford(s.late || {}, (d.t - nrTime(d.std, now)) / 60000);
+    }
+  }
+  try { sessionStorage.setItem('catchit.obs', JSON.stringify(obs)); } catch (e) {}
+  const ks = Object.keys(cfg.learnT); if (ks.length > 400) ks.slice(0, ks.length - 400).forEach(k => delete cfg.learnT[k]);
+  save();
+}
+function trainHabit(d) {
+  const s = (cfg.learnT || {})[bucketOf(d)]; if (!s) return null;
+  const pick = s.late?.n >= 3 ? {x: s.late, kind: 'late'} : s.drift?.n >= 3 ? {x: s.drift, kind: 'drift'} : null; if (!pick) return null;
+  const est = pick.x.n * pick.x.mean / (pick.x.n + 3), sd = Math.sqrt(pick.x.m2 / Math.max(1, pick.x.n - 1));
+  return {est, sd, n: pick.x.n, kind: pick.kind};
+}
+const habitTxt = h => h && Math.abs(h.est) >= 1 ? (h.kind === 'late' ? `usually ${Math.round(Math.abs(h.est))} min ${h.est > 0 ? 'late' : 'early'}` : `usually leaves ${Math.round(Math.abs(h.est))} min ${h.est > 0 ? 'later' : 'sooner'} than first shown`) : '';
+
 /* ---------- render ---------- */
 const refs = {};
 function render() {
-  const now = Date.now();
+  const now = Date.now(); learnTrains(now);
   $('#legend').innerHTML = deps.length ? '<details class="how"><summary>How to read the bars</summary><p class="note" style="margin:0 2px">The left edge is now. The coloured box is the bus or train coming in. <b>You</b> marks when you would reach the stop if you left now. If You is left of the box, you make it.</p></details>' : '';
   const wel = !deps.length && !demo && !cfg.places.length; $('#hero').hidden = wel; $('#modesBox').hidden = wel; $('#boardLbl').hidden = !deps.length;
   drawModes();
@@ -497,7 +575,7 @@ function chips(now) {
   deps.forEach((d, i) => {
     const r = refs[i]; if (!r?.c) return; const p = placeOf(d.placeId), v = verdict(d, p, now);
     const others = d.cancelled ? '' : modesFor(p).filter(m => m !== v.m).map(m => `${m.label} ${Math.round(chance(d, p, m.k, now) * 100)}%`).join(', ');
-    r.c.innerHTML = `<b class="${v.cls}">${esc(v.txt)}</b>${others ? `<span class="others">${esc(others)}</span>` : ''}${d.status && !/on time|cancel/i.test(d.status) ? ` <span class="chip a">${esc(d.status)}</span>` : ''}`;
+    r.c.innerHTML = `<b class="${v.cls}">${esc(v.txt)}</b>${others ? `<span class="others">${esc(others)}</span>` : ''}${d.status && !/on time|cancel/i.test(d.status) ? ` <span class="chip a">${esc(d.status)}</span>` : ''}${(() => { const ht = habitTxt(trainHabit(d)); return ht ? ` <span class="chip n">${esc(ht)}</span>` : ''; })()}`;
     const y = r.t?.querySelector('.you'); if (y && v.m) { y.dataset.m = v.m.k; y.style.background = v.m.col; y.textContent = 'You'; y.title = v.m.label; y.style.display = ''; } else if (y) y.style.display = 'none';
   });
 }
@@ -610,7 +688,7 @@ function drawTrip() {
   $('#cLift')?.addEventListener('click', () => askLift(p, deps.find(x => x.key === trip.key)));
 }
 function endTrip() {
-  { const p0 = placeOf(trip.placeId); if (p0) { const mins = (Date.now() - trip.start) / 60000, walk = modeSecs(p0, 'walk') / 60; cfg.story = [...(cfg.story || []).filter(s => Date.now() - s.at < 30 * 864e5), {at: Date.now(), place: p0.name, mode: trip.mode, mins: +mins.toFixed(1), saved: trip.mode !== 'walk' ? Math.max(0, +(walk - mins).toFixed(1)) : 0, line: trip.line || '', dest: trip.dest || '', dep: trip.dep || null}].slice(-80); save(); } }
+  { const p0 = placeOf(trip.placeId); if (p0) { const mins = (Date.now() - trip.start) / 60000, walk = modeSecs(p0, 'walk') / 60; cfg.story = [...(cfg.story || []).filter(s => Date.now() - s.at < 30 * 864e5), {at: Date.now(), place: p0.name, mode: trip.mode, mins: +mins.toFixed(1), dist: cfg.home && p0.lat ? Math.round(havM(cfg.home, [p0.lon, p0.lat]) * DETOUR) : null, saved: trip.mode !== 'walk' ? Math.max(0, +(walk - mins).toFixed(1)) : 0, line: trip.line || '', dest: trip.dest || '', dep: trip.dep || null}].slice(-80); save(); } }
   const p = cfg.places.find(q => q.id === trip.placeId);
   if (p) {
     let mins = (Date.now() - trip.start) / 60000 - (+p.platform || 0);
@@ -635,7 +713,27 @@ const EMPTY = {type: 'FeatureCollection', features: []};
    make this departure at that speed: r = v × (time to departure − platform walk − buffer − pick-up) ÷ 1.3 detour.
    Walking speed is your own (your walk time over your real distance); run, bike and lift scale from it.
    Everything outside the biggest ring is greyed out; the rings shrink every second. */
-const Z = {map: null, ready: false, b: null, key: '', fit: false};
+const Z = {map: null, ready: false, b: null, key: '', fit: false, mode: 'rings', soonAt: 0};
+/* soonest stop: a live, time-based Voronoi map. Each grid cell is coloured by the stop where, walking from there,
+   you'd board the earliest departure: t_i = first departure at stop i leaving after (now + walk to i + platform + buffer). */
+const SOON_COL = ['#6950a1', '#d70428', '#0098d4', '#ee7c0e', '#00782a', '#9b0058'];
+function soonTick(now, vw) {
+  const m = Z.map; if (!m.getSource('zsoon')) return;
+  if (Z.mode !== 'soon') { m.getSource('zsoon').setData(EMPTY); return; }
+  if (now - Z.soonAt < 8000) return; Z.soonAt = now;
+  const ps = cfg.places.filter(p => p.lat); if (ps.length < 2) { $('#zcap').textContent = 'Add two or more stops in Setup to compare which one gets you moving soonest.'; return; }
+  const b = m.getBounds(), W = b.getWest(), E = b.getEast(), S = b.getSouth(), Nn = b.getNorth(), n = 34, dx = (E - W) / n, dy = (Nn - S) / n, feats = [], wins = {};
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+    const c = [W + (i + 0.5) * dx, S + (j + 0.5) * dy]; let bestT = Infinity, who = -1;
+    ps.forEach((p, k) => { const arr = now + (havM(c, [p.lon, p.lat]) * DETOUR / vw + (+p.platform || 0) * 60 + cfg.buffer) * 1000; const d = deps.find(x => x.placeId === p.id && !x.cancelled && x.t >= arr); if (d && d.t < bestT) { bestT = d.t; who = k; } });
+    if (who < 0) continue; wins[who] = (wins[who] || 0) + 1;
+    feats.push({type: 'Feature', properties: {c: SOON_COL[who % SOON_COL.length]}, geometry: {type: 'Polygon', coordinates: [[[c[0] - dx / 2, c[1] - dy / 2], [c[0] + dx / 2, c[1] - dy / 2], [c[0] + dx / 2, c[1] + dy / 2], [c[0] - dx / 2, c[1] + dy / 2], [c[0] - dx / 2, c[1] - dy / 2]]]}});
+  }
+  m.getSource('zsoon').setData({type: 'FeatureCollection', features: feats});
+  const me = cfg.home; let line = 'Each colour shows the stop that gets you on something soonest if you walk from there, right now.';
+  if (me) { let bt = Infinity, bp = null; ps.forEach(p => { const arr = now + (havM(me, [p.lon, p.lat]) * DETOUR / vw + (+p.platform || 0) * 60 + cfg.buffer) * 1000; const d = deps.find(x => x.placeId === p.id && !x.cancelled && x.t >= arr); if (d && d.t < bt) { bt = d.t; bp = {p, d}; } }); if (bp) line = `From home, <b>${esc(bp.p.name)}</b> gets you moving soonest: the ${hhmm(bp.d.t)} ${esc(shortName(bp.d))}.`; }
+  $('#zcap').innerHTML = line + '<br>' + ps.map((p, k) => `<span class="sw" style="background:${SOON_COL[k % SOON_COL.length]}"></span>${esc(p.name)}`).join(' ');
+}
 async function zoneDraw(b) {
   const box = $('#zone');
   if (!b || !b.p?.lat || demo && !b.p.lat) { box.hidden = true; Z.b = null; return; }
@@ -646,6 +744,7 @@ async function zoneDraw(b) {
     Z.map.on('style.load', () => {
       const m = Z.map; CIStyle.restyle(m);
       m.addSource('zmask', {type: 'geojson', data: EMPTY}); m.addSource('zr', {type: 'geojson', data: EMPTY}); m.addSource('zl', {type: 'geojson', data: EMPTY}); m.addSource('zp', {type: 'geojson', data: EMPTY});
+      m.addSource('zsoon', {type: 'geojson', data: EMPTY}); m.addLayer({id: 'zsoon', type: 'fill', source: 'zsoon', paint: {'fill-color': ['get', 'c'], 'fill-opacity': 0.32, 'fill-antialias': false}});
       m.addLayer({id: 'zmask', type: 'fill', source: 'zmask', paint: {'fill-color': '#FFFFFF', 'fill-opacity': 0.6}});
       m.addLayer({id: 'zfill', type: 'fill', source: 'zr', paint: {'fill-color': ['get', 'c'], 'fill-opacity': 0.07}});
       m.addLayer({id: 'zline', type: 'line', source: 'zr', paint: {'line-color': ['get', 'c'], 'line-width': 3}});
@@ -665,15 +764,20 @@ function zoneTick() {
   const rings = modesFor(p).map(m => ({m, r: Math.max(0, sp[m.k] * (avail - (m.k === 'lift' ? cfg.liftPickup * 60 : 0)) / DETOUR)})).filter(x => x.r > 10).sort((a, b) => b.r - a.r);
   const fmt = r => r >= 1000 ? (r / 1000).toFixed(1) + ' km' : Math.round(r / 10) * 10 + ' m';
   const m = Z.map;
-  m.getSource('zr').setData({type: 'FeatureCollection', features: rings.map(x => ({type: 'Feature', properties: {c: x.m.col}, geometry: {type: 'Polygon', coordinates: [CIStyle.ring(st, x.r)]}}))});
+  // wind-shaped rings: from a point at angle a you travel toward the station (a + 180°), so the headwind you meet depends on a
+  const shaped = (m, r0) => { const out = []; for (let i = 0; i <= 72; i++) { const a = i / 72 * 360, w = m.k === 'lift' ? 0 : headwind((a + 180) % 360), v0 = {walk: 1.4, run: 3.3, bike: 5.5}[m.k] || 1, f = m.k === 'lift' || !w ? 1 : solveV(m.k, v0, w, 0) / v0, r = r0 * f, la = st[1] * Math.PI / 180; out.push([st[0] + r * Math.sin(a * Math.PI / 180) / (111320 * Math.cos(la)), st[1] + r * Math.cos(a * Math.PI / 180) / 110540]); } return out; };
+  rings.forEach(x => x.poly = shaped(x.m, x.r));
+  m.getSource('zr').setData({type: 'FeatureCollection', features: Z.mode === 'soon' ? [] : rings.map(x => ({type: 'Feature', properties: {c: x.m.col}, geometry: {type: 'Polygon', coordinates: [x.poly]}}))});
   m.getSource('zl').setData({type: 'FeatureCollection', features: rings.map(x => ({type: 'Feature', properties: {c: x.m.col, t: x.m.label + ' ' + fmt(x.r)}, geometry: {type: 'Point', coordinates: [st[0], st[1] + x.r / 110540]}}))});
   const world = [[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]];
-  m.getSource('zmask').setData({type: 'Feature', properties: {}, geometry: {type: 'Polygon', coordinates: rings.length ? [world, CIStyle.ring(st, rings[0].r).reverse()] : [world]}});
+  m.getSource('zmask').setData({type: 'Feature', properties: {}, geometry: {type: 'Polygon', coordinates: rings.length && Z.mode !== 'soon' ? [world, [...rings[0].poly].reverse()] : [world]}});
+  if (Z.mode === 'soon') m.getSource('zl').setData(EMPTY);
+  soonTick(now, vw);
   m.getSource('zp').setData({type: 'FeatureCollection', features: [{type: 'Feature', properties: {k: 'st'}, geometry: {type: 'Point', coordinates: st}}].concat(me ? [{type: 'Feature', properties: {k: 'me'}, geometry: {type: 'Point', coordinates: me}}] : [])});
   const dMe = me ? havM(me, st) : null, inside = me ? [...rings].reverse().find(x => dMe <= x.r) : null;
-  $('#zcap').innerHTML = !rings.length ? 'Too late for every way of getting there. Check Plan B.'
+  if (Z.mode !== 'soon') $('#zcap').innerHTML = !rings.length ? 'Too late for every way of getting there. Check Plan B.'
     : !me ? `Be inside a ring to make the ${hhmm(d.t)}. Rings shrink as time runs out.`
-    : inside ? `You're inside the <b style="color:${inside.m.col}">${inside.m.label.toLowerCase()}</b> ring, so ${inside.m.k === 'walk' ? 'walking is enough' : inside.m.k === 'lift' ? 'only a lift gets you there' : inside.m.label.toLowerCase() + 'ning gets you there'}.`
+    : inside ? `You're inside the <b style="color:${inside.m.col}">${inside.m.label.toLowerCase()}</b> ring, so ${inside.m.k === 'walk' ? 'walking is enough' : inside.m.k === 'lift' ? 'only a lift gets you there' : ({run: 'running', bike: 'cycling'})[inside.m.k] + ' gets you there'}.`
     : `You're outside every ring. This one has gone for you, so check Plan B.`;
   if (Z.fit) {
     Z.fit = false; const fitR = (rings.find(x => x.m.k !== 'lift') || rings[0])?.r || 400;
@@ -683,6 +787,7 @@ function zoneTick() {
   }
 }
 setInterval(zoneTick, 1000);
+document.querySelectorAll('.ztabs button').forEach(b => b.addEventListener('click', () => { Z.mode = b.dataset.z; Z.soonAt = 0; document.querySelectorAll('.ztabs button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); zoneTick(); }));
 
 /* Where-to route map: the journey draws itself leg by leg in line colours, once, when the plan appears */
 const RM = {map: null, raf: 0};
@@ -786,7 +891,7 @@ function drawPlan() {
   const wk = pick.find(p => p.m.k === 'walk'); if (wk) for (let i = pick.length - 1; i >= 0; i--) if (pick[i].r.arr > wk.r.arr) pick.splice(i, 1);   // drop modes that are slower than just walking
   const walk = pick.find(p => p.m.k === 'walk'), bestP = pick.reduce((a, b) => b.r.arr < a.r.arr ? b : a), span = Math.max(...pick.map(p => p.r.arr)) - now;
   const gain = walk && bestP.m.k !== "walk" ? Math.round((walk.r.arr - bestP.r.arr) / 60000) : 0;
-  const headline = gain >= 3 ? `${bestP.m.label} and you're there <b>${gain} min sooner</b>` : `Arrive <b>${hhmm(bestP.r.arr)}</b>` + (pick.length > 1 ? ' <span class="note">· running wouldn\'t catch anything faster</span>' : '');
+  const headline = gain >= 3 ? `${bestP.m.label} and you're there <b>${gain} min sooner</b> <span class="note">(worth £${(gain / 60 * cfg.hourValue).toFixed(2)} of your time)</span>` : `Arrive <b>${hhmm(bestP.r.arr)}</b>` + (pick.length > 1 ? ' <span class="note">· running wouldn\'t catch anything faster</span>' : '');
   const legsBar = r => `<div class="legs">${r.legs.map(l => `<span style="flex:${Math.max(1, l.duration)};background:${legCol(l)}" title="${esc(l.instruction.summary)}"></span>`).join('')}</div>`;
   const opts = [...new Map(pick.map(p => [p.r, p])).values()].sort((a, b) => a.r.arr - b.r.arr);
   $('#wRes').innerHTML = `<div class="plan">
@@ -933,6 +1038,7 @@ function openDetail(d) {
   const rows = modesFor(p).map(m => { const pr = chance(d, p, m.k, now), li = leaveIn(d, p, m.k, now); return `<tr><td>${m.label}</td><td>${Math.round(modeSecs(p, m.k) / 60)} min</td><td class="${cls(pr)}"><b>${Math.round(pr * 100)}%</b></td><td>${li > 0 ? 'leave in ' + mmss(li) : 'too late for 80%'}</td></tr>`; }).join('');
   sheet.innerHTML = `<button class="close" id="dClose">Close</button><h2><span class="badge" style="display:inline-grid;height:30px;padding:0 8px;vertical-align:middle;background:${d.colour}">${esc(shortLine(d))}</span> ${esc(d.dest)}</h2>
     <p class="note">${esc(d.platform || '')} · ${esc(p?.name || '')} · ${d.cancelled ? '<b class="x">Cancelled</b>' : 'departs ' + hhmm(d.t)} · source: ${esc(d.src)}</p>
+    ${(() => { const h = trainHabit(d); return h ? `<h3>What I've learned about this train</h3><p>Seen ${h.n} times at this hour. It's ${habitTxt(h) || 'usually on time'} (give or take ${h.sd.toFixed(1)} min).</p>` : ''; })()}
     <h3>Your chances</h3><table style="width:100%;border-collapse:collapse">${rows}</table>
     <p class="note">Chance = the train and your trip are both uncertain; Catch It combines both spreads (normal curves) with a ${cfg.buffer}s safety buffer.</p>
     ${d.coaches ? `<h3>Train length</h3><div class="coaches">${Array.from({length: d.coaches}, (_, k) => `<span>${k + 1}</span>`).join('')}</div><p class="note">${d.coaches} coaches. Per-coach busyness appears here when the operator supplies it.</p>` : ''}
@@ -1033,6 +1139,8 @@ function drawSetup() {
     <div class="field"><label for="fRun">Running time as share of walking</label><input id="fRun" type="number" step="0.05" min="0.2" max="1" value="${cfg.f.run}"></div>
     <div class="field"><label for="fBike">Cycling time as share of walking</label><input id="fBike" type="number" step="0.05" min="0.1" max="1" value="${cfg.f.bike}"></div>
     <div class="field"><label for="fDrive">Driving time as share of walking</label><input id="fDrive" type="number" step="0.05" min="0.05" max="1" value="${cfg.f.drive}"></div>
+    <div class="field"><label for="kg">Your weight in kg (for calories)</label><input id="kg" type="number" min="30" max="200" value="${cfg.kg}"></div>
+    <div class="field"><label for="hv">What an hour of your time is worth (£)</label><input id="hv" type="number" step="0.01" min="0" value="${cfg.hourValue}"></div>
     <div class="field"><label for="lp">Lift: minutes until pickup</label><input id="lp" type="number" min="0" max="60" value="${cfg.liftPickup}"></div>
     <div class="field"><label for="buf">Safety buffer (seconds)</label><input id="buf" type="number" min="0" max="180" value="${cfg.buffer}"></div>
     <div class="field"><label for="win">Show the next (minutes)</label><input id="win" type="number" min="10" max="120" value="${cfg.window}"></div>
@@ -1046,6 +1154,8 @@ function drawSetup() {
   const num = (id, fn) => $('#' + id).addEventListener('change', e => { const v = parseFloat(e.target.value); if (!isNaN(v)) { fn(v); save(); } });
   num('fRun', v => cfg.f.run = v); num('fBike', v => cfg.f.bike = v); num('fDrive', v => cfg.f.drive = v);
   num('lp', v => cfg.liftPickup = v); num('buf', v => cfg.buffer = v); num('win', v => cfg.window = v);
+  $('#kg')?.addEventListener('change', e => { cfg.kg = +e.target.value || 70; save(); });
+  $('#hv')?.addEventListener('change', e => { cfg.hourValue = +e.target.value || 0; save(); });
   $('#dk').addEventListener('change', e => { cfg.darwinKey = e.target.value.trim(); cfg.darwinPath = ''; save(); });
   $('#geo').addEventListener('click', () => {
     $('#homeNote').textContent = 'Asking for your location…';
@@ -1155,10 +1265,13 @@ function drawStory() {
   const box = $('#story'), S = (cfg.story || []).filter(s => Date.now() - s.at < 7 * 864e5).sort((a, b) => b.at - a.at);
   box.hidden = !S.length; if (!S.length) return;
   const saved = S.reduce((a, s) => a + (s.saved || 0), 0), days = {};
+  // energy = MET × body mass × hours (Compendium of Physical Activities); CO2 vs a petrol car at 0.17 kg/km
+  const MET = {walk: 3.5, run: 9.8, bike: 7.5, lift: 1.3}, kcal = s => MET[s.mode] * cfg.kg * s.mins / 60;
+  const kc = S.reduce((a, s) => a + kcal(s), 0), co2 = S.filter(s => s.mode !== 'lift' && s.dist).reduce((a, s) => a + s.dist / 1000 * 0.17, 0), worth = saved / 60 * cfg.hourValue;
   S.forEach(s => { const k = new Date(s.at).toLocaleDateString('en-GB', {weekday: 'long', day: 'numeric', month: 'short'}); (days[k] = days[k] || []).push(s); });
   const verb = {walk: 'Walked', run: 'Ran', bike: 'Cycled', lift: 'Got a lift'};
-  box.innerHTML = `<h2>Your trips</h2><p class="big2">${S.length} ${S.length === 1 ? 'trip' : 'trips'} this week${saved >= 1 ? `, ${Math.round(saved)} min saved by not just walking` : ''}</p>` +
-    Object.entries(days).map(([k, list]) => `<h3>${esc(k)}</h3><ol class="tl">${list.map(s => `<li><span class="tt">${hhmm(s.at - s.mins * 60000)}</span><span><b>${verb[s.mode] || 'Went'} to ${esc(s.place)}</b> in ${Math.round(s.mins)} min${s.line ? `, caught the ${s.dep ? hhmm(s.dep) + ' ' : ''}${esc(s.line)}` : ''}${s.saved >= 1 ? `<br><small class="g">${Math.round(s.saved)} min faster than walking</small>` : ''}</span></li>`).join('')}</ol>`).join('');
+  box.innerHTML = `<h2>Your trips</h2><p class="big2">${S.length} ${S.length === 1 ? 'trip' : 'trips'} this week${saved >= 1 ? `, ${Math.round(saved)} min saved by not just walking (worth £${worth.toFixed(2)} at £${cfg.hourValue}/h)` : ''}.</p><div class="stats"><div><b>${Math.round(kc)}</b><small>kcal burned</small></div><div><b>${co2.toFixed(1)}</b><small>kg CO₂ saved vs a car</small></div><div><b>${Math.round(saved)}</b><small>min saved</small></div></div>` +
+    Object.entries(days).map(([k, list]) => `<h3>${esc(k)}</h3><ol class="tl">${list.map(s => `<li><span class="tt">${hhmm(s.at - s.mins * 60000)}</span><span><b>${verb[s.mode] || 'Went'} to ${esc(s.place)}</b> in ${Math.round(s.mins)} min${s.line ? `, caught the ${s.dep ? hhmm(s.dep) + ' ' : ''}${esc(s.line)}` : ''}${s.saved >= 1 ? `<br><small class="g">${Math.round(s.saved)} min faster than walking</small>` : ''}<br><small class="note">${Math.round(kcal(s))} kcal${s.dist ? ', ' + (s.dist >= 1000 ? (s.dist / 1000).toFixed(1) + ' km' : s.dist + ' m') : ''}</small></span></li>`).join('')}</ol>`).join('');
 }
 drawStory();
 drawMoney();

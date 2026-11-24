@@ -205,3 +205,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{ou
 .steps li i{position:absolute;left:-17px;top:10px;width:9px;height:9px;border-radius:50%}
 .mrow{display:grid;grid-template-columns:auto auto 1fr;gap:4px 10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--hair)}
 .mrow small{grid-column:1/-1;font-weight:600}
+.sum .phys{color:var(--soft);font-size:15px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0 4px}
+.stats div{border-left:1px solid var(--hair);padding:0 10px}.stats div:first-child{border-left:0;padding-left:0}
+.stats b{display:block;font-weight:200;font-size:34px;letter-spacing:-.04em;line-height:1}.stats small{color:var(--muted)}
+.ztabs{display:grid;grid-template-columns:1fr 1fr;gap:2px;background:var(--fill);border-radius:999px;padding:4px;margin:10px 10px 8px}
+.ztabs button{min-height:36px;font-size:14px;color:var(--muted)}.ztabs button[aria-pressed=true]{background:var(--bg);color:var(--ink);box-shadow:0 1px 4px rgba(22,24,29,.12)}
+.sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin:0 4px 0 8px;vertical-align:-1px}

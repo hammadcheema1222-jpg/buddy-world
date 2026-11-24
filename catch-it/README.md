@@ -11,6 +11,10 @@
 | `station.html` Station | Entrance-to-platform time from OpenStreetMap indoor data: quickest, step-free or no-lift routes, crowd-adjusted walking speed, live TfL lift problems |
 
 ## Making the train
+- **Physics of getting there**: live wind (Open-Meteo) in a power balance c·v + ½ρ·CdA·(v+w)²·v = P; hills with Tobler's hiking function e^(−3.5·|grade+0.05|) and climbing force for bikes; Riegel's tiredness law for longer runs. The catch rings bend with the wind.
+- **Learns each train**: Welford running stats of "real departure − first shown" and (with Darwin) lateness vs timetable, per stop/line/weekday/hour, shrunk toward zero with a 3-sighting prior. You see things like "usually 2 min late".
+- **Soonest stop map**: a live time-based Voronoi map that colours every spot by the stop that gets you onto something soonest if you walk from there.
+- **Energy and time value**: calories (MET × kg × hours), CO₂ saved vs a car (0.17 kg/km), and minutes saved valued at your hourly rate (default £12.71, the National Living Wage from April 2026).
 - **Ideas borrowed from loved apps that shut down**: a Dark Sky-style one-line "next hour" summary and a 60-minute departure strip; Google Now-style trips that open by themselves when you usually make them (after 2+ days at the same time); a Moves-style "Your trips" storyline with minutes saved; Inbox-style trip bundles (every step in one card) and Snooze.
 - **Catch zone** (Board): a live isochrone around your station. Each ring is how far away you could be and still make the departure at that speed: r = v × (time left − platform walk − buffer − pick-up) ÷ 1.3. The rings shrink every second, everything outside them is greyed out, and it tells you which ring you're in.
 - **Route draw** (Where to?): the fastest journey draws itself leg by leg in official line colours, using MapLibre `line-progress` gradients.
