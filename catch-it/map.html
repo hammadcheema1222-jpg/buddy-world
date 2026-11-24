@@ -68,6 +68,11 @@ details summary{cursor:pointer;font-weight:600;font-size:14px;margin:8px 0}
   <h2>Live map</h2>
   <p class="note" id="status">Loading your lines…</p>
   <div class="seg" role="group" aria-label="View"><button data-v="map">Map</button><button data-v="sat">Satellite</button><button data-v="3d">3D world</button></div>
+  <div id="w3d" class="note" style="margin-top:8px"><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="realB" checked> Real 3D buildings, roofs, domes and trees</label><span id="w3s"></span>
+  <label style="display:block;margin-top:6px">Hills and mountains: <b><span id="exT">1.0</span>× height</b><input type="range" id="exag" min="1" max="3" step="0.1" value="1" style="width:100%;accent-color:#6950a1"></label></div>
+  <h3>Go anywhere</h3>
+  <input id="go" placeholder="e.g. The O2, Snowdon, Big Ben" autocomplete="off" style="width:100%;min-height:44px;border-radius:10px;border:1px solid var(--line);padding:0 12px;font:inherit;background:var(--bg);color:var(--ink)">
+  <div id="goRes" class="chips" style="margin-top:6px"></div>
   <h3>Ride a real train or bus</h3>
   <select id="route" aria-label="Line and direction"></select>
   <div class="row2"><button class="main" id="ride">Ride the next one (live)</button><button id="preview">Fast preview</button></div>
@@ -76,13 +81,14 @@ details summary{cursor:pointer;font-weight:600;font-size:14px;margin:8px 0}
   <h3>Lines on the map</h3>
   <div class="chips" id="rail"></div>
   <details id="busBox"><summary id="busSum">Buses at your stops</summary><div class="chips" id="bus"></div></details>
-  <p class="note" style="margin-top:12px">Powered by TfL Open Data. Imagery © Esri, Maxar, Earthstar Geographics. Terrain: AWS Terrain Tiles (Mapzen). Map © OpenFreeMap, © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors.</p>
+  <p class="note" style="margin-top:12px">Powered by TfL Open Data. Imagery © Esri, Maxar, Earthstar Geographics. Terrain: AWS Terrain Tiles (Mapzen). 3D buildings, roofs and trees © OpenStreetMap contributors via Overpass. Search: Photon by komoot. Map © OpenFreeMap, © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors.</p>
 </aside>
 <div class="frame" id="frame"></div>
 <div class="hud" id="hud"><span id="hudTxt">Riding…</span><button data-look="C">Outside</button><button data-look="L">Left</button><button data-look="F">Front</button><button data-look="R">Right</button><button id="hudStop">Stop</button></div>
 
 <script src="https://unpkg.com/maplibre-gl@5.24.1/dist/maplibre-gl.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="world3d.js"></script>
 <script>
 {
 const TFL = 'https://api.tfl.gov.uk';
@@ -142,7 +148,9 @@ function addOverlays() {
   const is3d = cfg.view === '3d';
   if (is3d) {
     if (!map.getSource('dem')) map.addSource('dem', {type: 'raster-dem', tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], encoding: 'terrarium', tileSize: 256, maxzoom: 15, attribution: 'Terrain: AWS Terrain Tiles'});
-    try { map.setTerrain({source: 'dem', exaggeration: 1}); } catch (e) {}
+    try { map.setTerrain({source: 'dem', exaggeration: cfg.exag || 1}); } catch (e) {}
+    if (!map.getSource('demh')) map.addSource('demh', {type: 'raster-dem', tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], encoding: 'terrarium', tileSize: 256, maxzoom: 15});
+    if (!map.getLayer('hill')) map.addLayer({id: 'hill', type: 'hillshade', source: 'demh', paint: {'hillshade-exaggeration': 0.3, 'hillshade-shadow-color': '#1d2433', 'hillshade-highlight-color': '#fffdf5', 'hillshade-accent-color': '#3a3020'}}, map.getLayer('bld') ? 'bld' : undefined);
   }
   for (const l of found) if (cfg.mapLines?.includes(l.id) && l.ls) drawLine(l);
   map.addSource('veh', {type: 'geojson', data: {type: 'FeatureCollection', features: []}});
@@ -156,6 +164,7 @@ function sky() {
   try { map.setSky({'sky-color': day ? '#79b2ec' : dusk ? '#e08a6a' : '#0b1430', 'horizon-color': day ? '#eef3f7' : dusk ? '#f5c48a' : '#26305a', 'fog-color': day ? '#dfe8f0' : '#1b2244', 'sky-horizon-blend': 0.6, 'horizon-fog-blend': 0.7, 'fog-ground-blend': 0.75, 'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 12, 0]}); } catch (e) {}
   try { if (map.getLayer('sat')) map.setPaintProperty('sat', 'raster-brightness-max', day ? 1 : dusk ? 0.75 : 0.45); } catch (e) {}
   try { map.setLight({anchor: 'map', position: [1.4, s.az / DEG, Math.max(10, 90 - s.el / DEG)], intensity: day ? 0.45 : 0.2, color: day ? '#fff6e0' : '#9aa6d6'}); } catch (e) {}
+  window.World3D?.night(!day);
   if (three) { const d = new THREE.Vector3(Math.sin(s.az) * Math.cos(s.el), Math.max(0.15, Math.sin(s.el)), -Math.cos(s.az) * Math.cos(s.el)); three.sun.position.copy(d); three.sun.intensity = day ? 0.95 : 0.25; three.hemi.intensity = day ? 0.8 : 0.35; }
 }
 setInterval(sky, 300000);
@@ -210,7 +219,7 @@ function threeLayer() {
       this.hemi = new THREE.HemisphereLight(0xffffff, 0x4b5563, 0.8); this.scene.add(this.hemi);
       this.sun = new THREE.DirectionalLight(0xffffff, 0.95); this.scene.add(this.sun);
       this.renderer = new THREE.WebGLRenderer({canvas: m.getCanvas(), context: gl, antialias: true}); this.renderer.autoClear = false;
-      this.group = new THREE.Group(); this.scene.add(this.group); three = this; sky();
+      this.group = new THREE.Group(); this.scene.add(this.group); three = this; sky(); window.World3D?.attach(this);
     },
     render(gl, args) {
       place3D();
@@ -220,10 +229,14 @@ function threeLayer() {
       this.camera.projectionMatrix = m.multiply(l);
       this.renderer.resetState(); this.renderer.render(this.scene, this.camera); map.triggerRepaint();
     },
-    onRemove() { three = null; }
+    onRemove() { three = null; window.World3D?.detach(); }
   };
 }
 const elev = p => { try { return map.queryTerrainElevation(p) || 0; } catch (e) { return 0; } };
+window.CI = {map, local, elev, onStatus: () => { const s = $('#w3s'); if (s) s.textContent = window.World3D?.status || ''; }};
+map.on('moveend', () => { if (cfg.view === '3d') window.World3D?.update(); });
+map.on('idle', () => { if (cfg.view === '3d') { window.World3D?.update(); window.World3D?.reground(); } });
+map.on('sourcedata', e => { if (e.sourceId === 'dem' && e.isSourceLoaded && cfg.view === '3d') window.World3D?.reground(); });
 function place3D() {
   if (!three) return;
   const now = Date.now(), cen = map.getCenter(), z = map.getZoom(), show = z >= 14.3;
@@ -436,6 +449,19 @@ async function poll() {
 }
 map.once('load', init);
 $('#grab').addEventListener('click', () => $('#panel').classList.toggle('min'));
+$('#exag').value = cfg.exag || 1; $('#exT').textContent = (+$('#exag').value).toFixed(1);
+$('#exag').addEventListener('input', e => { cfg.exag = +e.target.value; $('#exT').textContent = cfg.exag.toFixed(1); try { if (map.getTerrain()) map.setTerrain({source: 'dem', exaggeration: cfg.exag}); } catch (er) {} save(); });
+$('#realB').addEventListener('change', e => { if (window.World3D) { window.World3D.on = e.target.checked; if (!e.target.checked) { try { map.setLayerZoomRange('bld', 14, 24); } catch (er) {} } window.World3D.update(); map.triggerRepaint(); } });
+let gt; $('#go').addEventListener('input', e => { clearTimeout(gt); gt = setTimeout(() => goSearch(e.target.value), 450); });
+async function goSearch(q) {
+  q = q.trim(); if (q.length < 3) { $('#goRes').innerHTML = ''; return; }
+  try {
+    const r = await getJSON('https://photon.komoot.io/api/?limit=5&lang=en&q=' + encodeURIComponent(q));
+    const fs = r.features || [];
+    $('#goRes').innerHTML = fs.map((f, i) => `<button data-g="${i}" style="min-height:38px">${esc(f.properties.name || q)}${f.properties.city ? ', ' + esc(f.properties.city) : f.properties.country ? ', ' + esc(f.properties.country) : ''}</button>`).join('') || '<span class="note">No match.</span>';
+    $('#goRes').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { const f = fs[+b.dataset.g]; if (cfg.view !== '3d') setView('3d'); map.flyTo({center: f.geometry.coordinates, zoom: 16.3, pitch: 62, bearing: 20, duration: 3500}); }));
+  } catch (e) { $('#goRes').innerHTML = '<span class="note">Search unavailable right now.</span>'; }
+}
 
 /* ---------- ride and seat advisor ---------- */
 let routeOpts = [];

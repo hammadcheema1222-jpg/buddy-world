@@ -10,6 +10,15 @@
 | `map.html` Map | Map, Satellite or 3D world (satellite imagery + real terrain + 3D buildings + real-time sky). Every live bus and train as a 3D model on its real road or OpenStreetMap track. Ride a real vehicle live (outside chase cam or left/right/front window) or a fast preview; which side to sit on (sun glare + parks and water) |
 | `station.html` Station | Entrance-to-platform time from OpenStreetMap indoor data: quickest, step-free or no-lift routes, crowd-adjusted walking speed, live TfL lift problems |
 
+## The real 3D world (map → 3D world)
+- **Buildings from OpenStreetMap** (via Overpass), built in Three.js from their true footprints. Curved outlines stay curved, and courtyards stay hollow. Height comes from `height`, or `building:levels` × 3.2 m.
+- **Real roof shapes** from `roof:shape`: dome/onion (rings scaled by cos θ, lifted by sin θ, which is how the O2's dome is drawn), gabled, hipped, mansard, pyramidal, cone and skillion (which follows `roof:direction`). Untagged UK houses get a gabled or hipped roof.
+- `building:part` pieces replace the plain outline, so towers and spires show their real shapes. Colours come from `building:colour` and `roof:colour`, or from the material.
+- **Trees, woods, masts and chimneys** come from OSM. The woodland is scattered inside its real boundary.
+- **Real terrain**: AWS Terrarium elevation tiles with hillshade. A slider exaggerates hills and mountains up to 3×. Buildings, trees and masts re-settle onto the ground once the terrain loads.
+- **Sun and sky** use the solar-position formula for your time and place, and windows light up at night.
+- **Go anywhere**: search any place on Earth (Photon/OSM geocoder) and fly there.
+
 ## The maths inside
 - **Catch chance:** both your trip time and the vehicle's time are uncertain (normal curves); P(catch) = Φ((T_vehicle − T_you − buffer) / √(σ_v² + σ_you²)).
 - **Kalman filter** smooths jumpy live predictions so vehicles glide instead of jumping.
