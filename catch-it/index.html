@@ -199,7 +199,7 @@ details summary{cursor:pointer;font-weight:600;margin:10px 0}
 @media(prefers-reduced-motion:reduce){.busnow{transition:none}}
 </style>
 <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="ui.css?v=1795556423">
+<link rel="stylesheet" href="ui.css?v=1795556748">
 </head>
 <body class="tabs">
 <div class="top">
@@ -222,13 +222,14 @@ details summary{cursor:pointer;font-weight:600;margin:10px 0}
   <p class="sum" id="sum"></p>
   <div class="strip" id="strip" aria-hidden="true"></div>
   <section id="hero" class="call calm" aria-live="polite"></section>
-  <div class="zone" id="zone" hidden><div class="ztabs" role="group" aria-label="Map type"><button data-z="rings" aria-pressed="true">Catch rings</button><button data-z="soon" aria-pressed="false">Soonest stop</button></div><div id="zmap" role="img" aria-label="Catch zone map: how far from the station you could be and still make this departure"></div><p class="zcap" id="zcap"></p><p class="mcred">Map © OpenFreeMap, © OpenStreetMap contributors</p></div>
+  <div class="zone" id="zone" hidden><div class="ztabs" role="group" aria-label="Map type"><button data-z="rings" aria-pressed="true">Catch rings</button><button data-z="soon" aria-pressed="false">Soonest</button><button data-z="time" aria-pressed="false">Time map</button></div><div id="tmap" hidden></div><div id="zmap" role="img" aria-label="Catch zone map: how far from the station you could be and still make this departure"></div><p class="zcap" id="zcap"></p><p class="mcred">Map © OpenFreeMap, © OpenStreetMap contributors</p></div>
   <div id="tripBox"></div>
   <div id="modesBox"><p class="lbl">How you can get there today</p><div class="modes" id="modes"></div></div>
   <p class="lbl" id="boardLbl">Everything you can catch</p>
   <div class="legend" id="legend"></div>
   <section id="board" aria-live="polite"></section>
   <section class="story" id="story" hidden></section>
+  <div class="thumb" id="thumb" hidden><span id="thT">Leave in</span><button id="thGo">I'm going</button></div>
   <section class="money" id="money" hidden></section>
   <p class="note" id="foot"></p>
 </main>
@@ -473,10 +474,10 @@ function drawSummary(now) {
   el.innerHTML = ok.length && b ? `<b>Next hour:</b> ${ok.length} ${ok.length === 1 ? 'departure' : 'departures'} you can still catch. The best is the ${hhmm(b.d.t)} ${esc(shortName(b.d))}${b.m.k !== 'walk' ? ' if you ' + verbOf(b.m.k) : ''}.` : '<b>Next hour:</b> nothing you can still catch from here. Try Where to? for another way.';
   if (b) { const pn = physNote(b.p, b.m.k); if (pn) el.innerHTML += `<br><span class="phys">${esc(pn)}</span>`; }
   st.hidden = false;
-  if (!st.dataset.built) { st.dataset.built = '1'; st.innerHTML = '<i class="sl"></i>' + [0, 15, 30, 45, 60].map(m => `<span class="sx" style="left:${m / 60 * 100}%">${m ? m + ' min' : 'now'}</span>`).join('') + '<div class="sm" id="sm"></div>'; }
+  if (!st.dataset.built) { st.dataset.built = '1'; st.innerHTML = '<i class="sl"></i>' + [0, 5, 10, 20, 60].map(m => `<span class="sx" style="left:${fisheye(m / 60) * 100}%">${m ? m + ' min' : 'now'}</span>`).join('') + '<div class="sm" id="sm"></div>'; }
   const sm = $('#sm'), have = new Set();
   L.forEach(x => { const id = 'tk-' + x.d.key.replace(/[^\w-]/g, '_'); have.add(id); let e = document.getElementById(id); if (!e) { e = document.createElement('span'); e.id = id; e.className = 'tk'; sm.appendChild(e); }
-    const can = x.v.cls === 'g' || x.v.cls === 'a'; e.style.left = ((x.d.t - now) / 3600e3 * 100) + '%'; e.style.background = x.d.colour; e.classList.toggle('can', can); e.classList.toggle('best', !!b && b.d.key === x.d.key); e.title = `${hhmm(x.d.t)} ${shortName(x.d)}: ${x.v.txt || ''}`; });
+    const can = x.v.cls === 'g' || x.v.cls === 'a'; e.style.left = (fisheye(Math.min(1, (x.d.t - now) / 3600e3)) * 100) + '%'; e.style.background = x.d.colour; e.classList.toggle('can', can); e.classList.toggle('best', !!b && b.d.key === x.d.key); e.title = `${hhmm(x.d.t)} ${shortName(x.d)}: ${x.v.txt || ''}`; });
   sm.querySelectorAll('.tk').forEach(e => { if (!have.has(e.id)) e.remove(); });
 }
 
@@ -523,6 +524,40 @@ function trainHabit(d) {
 }
 const habitTxt = h => h && Math.abs(h.est) >= 1 ? (h.kind === 'late' ? `usually ${Math.round(Math.abs(h.est))} min ${h.est > 0 ? 'late' : 'early'}` : `usually leaves ${Math.round(Math.abs(h.est))} min ${h.est > 0 ? 'later' : 'sooner'} than first shown`) : '';
 
+/* ---------- maths for design ---------- */
+/* springs: critically damped (c = 2√k) so markers glide to new predictions without wobble */
+const SPR = new Map();
+function spring(id, target, dt) { let s = SPR.get(id); if (!s || !isFinite(s.x)) { s = {x: target, v: 0}; SPR.set(id, s); } const k = 60, c = 2 * Math.sqrt(k), a = k * (target - s.x) - c * s.v; s.v += a * dt; s.x += s.v * dt; if (Math.abs(target - s.x) < 0.01 && Math.abs(s.v) < 0.01) { s.x = target; s.v = 0; } return s.x; }
+/* Sarkar–Brown fisheye with the focus on "now": g(x) = (d+1)x / (dx+1), d = 3 gives the next 10 minutes ~half the strip */
+const fisheye = (x, d = 3) => (d + 1) * x / (d * x + 1);
+/* uncertainty of a departure in seconds: the timetable spread combined with the Kalman filter's remaining variance */
+const sigmaOf = d => Math.sqrt((d.sigma || 60) ** 2 + (kf[d.key] ? kf[d.key].P / 1e6 : 0));
+/* WCAG contrast + OKLCH lightness search: keep each line's hue, change only lightness until text reads at ≥ 4.5:1 */
+const hex2rgb = h => { h = h.replace('#', ''); if (h.length === 3) h = h.replace(/./g, c => c + c); const n = parseInt(h, 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(v => v / 255); };
+const lin = c => c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4, gam = c => c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055;
+const lum = rgb => { const [r, g, b] = rgb.map(lin); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+const contrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+function toOklch([r, g, b]) { [r, g, b] = [r, g, b].map(lin); const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b), m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b), s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b); const L = 0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s, A = 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s, B = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s; return [L, Math.hypot(A, B), Math.atan2(B, A)]; }
+function fromOklch([L, C, H]) { const A = C * Math.cos(H), B = C * Math.sin(H); const l = (L + 0.3963377774 * A + 0.2158037573 * B) ** 3, m = (L - 0.1055613458 * A - 0.0638541728 * B) ** 3, s = (L - 0.0894841775 * A - 1.291485548 * B) ** 3; return [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s, -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s, -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s].map(v => Math.min(1, Math.max(0, gam(v)))); }
+const rgb2hex = c => '#' + c.map(v => Math.round(v * 255).toString(16).padStart(2, '0')).join('');
+const READ = new Map();
+function readable(bg) {
+  if (!/^#?[0-9a-f]{3,6}$/i.test(bg || '')) return null; if (READ.has(bg)) return READ.get(bg);
+  const c = hex2rgb(bg), W = [1, 1, 1], K = [0.086, 0.094, 0.114]; let out;
+  if (contrast(c, W) >= 4.5) out = {bg, fg: '#ffffff'}; else if (contrast(c, K) >= 4.5) out = {bg, fg: '#16181d'};
+  else { const o = toOklch(c); let L = o[0], x = c; while (L > 0.05 && contrast(x, W) < 4.5) { L -= 0.01; x = fromOklch([L, o[1], o[2]]); } out = {bg: rgb2hex(x), fg: '#ffffff'}; }
+  READ.set(bg, out); return out;
+}
+const toHex = s => { if (!s) return null; if (s[0] === '#') return s; const m = s.match(/\d+/g); return m && m.length >= 3 ? rgb2hex(m.slice(0, 3).map(v => +v / 255)) : null; };
+function fixContrast(root = document) { root.querySelectorAll('.pill,.badge,.rv,.veh,.alt .pill').forEach(e => { if (e.dataset.cx === e.style.background) return; const r = readable(toHex(e.style.backgroundColor)); if (r) { e.style.background = r.bg; e.style.color = r.fg; e.dataset.cx = e.style.background; } }); }
+new MutationObserver(() => { clearTimeout(fixContrast.t); fixContrast.t = setTimeout(fixContrast, 30); }).observe(document.body, {childList: true, subtree: true});
+/* Pareto: within the same destination, hide a departure if an earlier one is catchable with no more effort */
+const EFFORT = {walk: 0, bike: 1, run: 2, lift: 3};
+function dominated(d, now) {
+  const p = placeOf(d.placeId); if (!p) return false; const v = verdict(d, p, now); if (!v.m || v.cls !== 'g') return false;
+  return deps.some(o => o !== d && !o.cancelled && o.dest === d.dest && o.t < d.t && (() => { const w = verdict(o, placeOf(o.placeId), now); return w.cls === 'g' && EFFORT[w.m.k] <= EFFORT[v.m.k]; })());
+}
+
 /* ---------- render ---------- */
 const refs = {};
 function render() {
@@ -548,12 +583,12 @@ function render() {
         <div class="dest">${esc(d.dest)}<small>${esc(d.platform || '')} · ${esc(p?.name || '')}</small></div>
         <div class="when" data-w="${i}">--<small></small></div>
         <div class="verdict" data-c="${i}"></div>
-        <div class="track" data-t="${i}"><div class="fill"></div><div class="now"></div>${ticks()}<div class="mk you" data-m="walk">You</div><div class="mk veh" style="background:${d.colour}">${d.mode === 'bus' ? 'BUS' : 'TRAIN'}</div></div>
+        <div class="track" data-t="${i}"><div class="fill"></div><div class="cloud" style="--c:${d.colour}"></div><div class="now"></div>${ticks()}<div class="mk you" data-m="walk">You</div><div class="mk veh" style="background:${d.colour}">${d.mode === 'bus' ? 'BUS' : 'TRAIN'}</div></div>
       </div>`;
     };
-    const ok = [], late = [];
-    deps.forEach((d, i) => { const p = placeOf(d.placeId), v = verdict(d, p, now); (v.cls === 'n' && !d.cancelled ? late : ok).push(rowHtml(d, i)); });
-    board.innerHTML = ok.join('') + (late.length ? `<details class="late"><summary>Too late to catch (${late.length})</summary>${late.join('')}</details>` : '');
+    const ok = [], later = [], late = [];
+    deps.forEach((d, i) => { const p = placeOf(d.placeId), v = verdict(d, p, now); (v.cls === 'n' && !d.cancelled ? late : dominated(d, now) ? later : ok).push(rowHtml(d, i)); });
+    board.innerHTML = ok.join('') + (later.length ? `<details class="late"><summary>Later trains to the same places (${later.length}): an earlier one is just as easy</summary>${later.join('')}</details>` : '') + (late.length ? `<details class="late"><summary>Too late to catch (${late.length})</summary>${late.join('')}</details>` : '');
     board.querySelectorAll('.row').forEach(r => { const go = () => openDetail(deps[+r.dataset.i]); r.addEventListener('click', go); r.addEventListener('keydown', e => { if (e.key === 'Enter') go(); }); });
   }
   for (const k in refs) delete refs[k];
@@ -597,7 +632,7 @@ function heroDraw(now) {
     <div class="big"><span class="verb" style="color:${ok ? '#fff' : b.m.col}">${svgI(b.m.k).replace('<svg', '<svg style="width:18px;height:18px;vertical-align:-3px;margin-right:4px"')}${esc(b.m.label)}</span><span class="l" id="leaveLbl">leave in</span></div>
     <div class="big" style="margin-top:0"><b id="leaveTxt">--</b></div>
     <div class="race" aria-hidden="true">
-      <div class="lane"><span class="goal">PLATFORM</span><i class="flag"></i><span class="rv" id="rvT" style="background:${d.colour}">${d.mode === 'bus' ? 'BUS ' + esc(d.line) : 'TRAIN'}</span></div>
+      <div class="lane"><span class="goal">PLATFORM</span><i class="flag"></i><i class="cloud" id="cloudT" style="--c:${d.colour}"></i><span class="rv" id="rvT" style="background:${d.colour}">${d.mode === 'bus' ? 'BUS ' + esc(d.line) : 'TRAIN'}</span></div>
       <div class="lane"><span class="goal">PLATFORM</span><i class="flag"></i><span class="rv" id="rvY" style="background:${b.m.col}">YOU</span></div>
     </div>
     <p class="raceTxt" id="raceTxt"></p>
@@ -633,7 +668,8 @@ function frame(ts) {
     const secs = (shown[d.key] - now) / 1000;
     r.w.firstChild.nodeValue = d.cancelled ? '—' : hhmm(d.t);
     r.w.lastChild.textContent = secs <= 30 ? 'due now' : 'in ' + mmss(secs);
-    const veh = r.t.querySelector('.veh'); veh.style.left = `max(18px, ${scale(secs)}%)`;
+    const veh = r.t.querySelector('.veh'), sx = spring('v' + d.key, scale(secs), dt); veh.style.left = `max(18px, ${sx}%)`;
+    const cl = r.t.querySelector('.cloud'); if (cl) { const sg = sigmaOf(d), a = scale(secs - 2 * sg), b2 = scale(secs + 2 * sg); cl.style.left = a + '%'; cl.style.width = Math.max(2, b2 - a) + '%'; }
     r.t.querySelector('.fill').style.width = scale(secs) + '%';
     const p = placeOf(d.placeId);
     r.t.querySelectorAll('.you').forEach(y => { y.style.left = `max(10px, ${scale(modeSecs(p, y.dataset.m))}%)`; });
@@ -644,8 +680,10 @@ function frame(ts) {
     $('#leaveTxt').textContent = li <= 0 ? 'Now' : mmss(li);
     $('#leaveLbl').textContent = li <= 0 ? 'leave' : 'leave in';
     const S = Math.max(0, (d.t - now) / 1000), T = modeSecs(p, h.dataset.m), W = Math.max(S, T, 600) * 1.08;
-    const pos = s => `calc(${Math.max(0, Math.min(1, 1 - s / W)) * 100}% * .86 + 24px)`;
-    $('#rvT').style.left = pos(S); $('#rvY').style.left = pos(T);
+    const frac = s => Math.max(0, Math.min(1, 1 - s / W)) * 100, pos = f => `calc(${f}% * .86 + 24px)`;
+    $('#rvT').style.left = pos(spring('rvT', frac(S), dt)); $('#rvY').style.left = pos(spring('rvY', frac(T), dt));
+    const sg = sigmaOf(d), cT = $('#cloudT'); if (cT) { const a = frac(S + 2 * sg), b2 = frac(Math.max(0, S - 2 * sg)); cT.style.left = pos(a); cT.style.width = `calc(${Math.max(1, b2 - a)}% * .86)`; }
+    const tb = $('#thumb'); if (tb && !tb.hidden) { $('#thT').textContent = li <= 0 ? 'Leave now' : 'Leave in ' + mmss(li); }
     $('#raceTxt').textContent = `If you left now: you reach the platform in ${mmss(T)}, the ${d.mode === 'bus' ? 'bus' : 'train'} leaves in ${mmss(S)}.` + (T < S ? ` ${mmss(S - T)} to spare.` : ' Too tight, it would beat you.');
   }
   if (trip) { const el = $('#tripT'); if (el) el.textContent = mmss((now - trip.start) / 1000); }
@@ -748,7 +786,7 @@ async function zoneDraw(b) {
       m.addLayer({id: 'zmask', type: 'fill', source: 'zmask', paint: {'fill-color': '#FFFFFF', 'fill-opacity': 0.6}});
       m.addLayer({id: 'zfill', type: 'fill', source: 'zr', paint: {'fill-color': ['get', 'c'], 'fill-opacity': 0.07}});
       m.addLayer({id: 'zline', type: 'line', source: 'zr', paint: {'line-color': ['get', 'c'], 'line-width': 3}});
-      m.addLayer({id: 'zlab', type: 'symbol', source: 'zl', layout: {'text-field': ['get', 't'], 'text-font': ['Noto Sans Bold'], 'text-size': 12, 'text-offset': [0, -0.7], 'text-allow-overlap': true}, paint: {'text-color': ['get', 'c'], 'text-halo-color': '#ffffff', 'text-halo-width': 2}});
+      m.addLayer({id: 'zlab', type: 'symbol', source: 'zl', layout: {'text-field': ['get', 't'], 'text-font': ['Noto Sans Bold'], 'text-size': 12, 'text-offset': [0, -0.7], 'text-allow-overlap': true, 'text-offset': [0, -0.4]}, paint: {'text-color': ['get', 'c'], 'text-halo-color': '#ffffff', 'text-halo-width': 2.5}});
       m.addLayer({id: 'zpt', type: 'circle', source: 'zp', paint: {'circle-radius': ['match', ['get', 'k'], 'st', 9, 8], 'circle-color': ['match', ['get', 'k'], 'st', '#FFD100', '#2f6fde'], 'circle-stroke-color': ['match', ['get', 'k'], 'st', '#000000', '#ffffff'], 'circle-stroke-width': 3}});
       Z.ready = true; zoneTick();
     });
@@ -768,7 +806,13 @@ function zoneTick() {
   const shaped = (m, r0) => { const out = []; for (let i = 0; i <= 72; i++) { const a = i / 72 * 360, w = m.k === 'lift' ? 0 : headwind((a + 180) % 360), v0 = {walk: 1.4, run: 3.3, bike: 5.5}[m.k] || 1, f = m.k === 'lift' || !w ? 1 : solveV(m.k, v0, w, 0) / v0, r = r0 * f, la = st[1] * Math.PI / 180; out.push([st[0] + r * Math.sin(a * Math.PI / 180) / (111320 * Math.cos(la)), st[1] + r * Math.cos(a * Math.PI / 180) / 110540]); } return out; };
   rings.forEach(x => x.poly = shaped(x.m, x.r));
   m.getSource('zr').setData({type: 'FeatureCollection', features: Z.mode === 'soon' ? [] : rings.map(x => ({type: 'Feature', properties: {c: x.m.col}, geometry: {type: 'Polygon', coordinates: [x.poly]}}))});
-  m.getSource('zl').setData({type: 'FeatureCollection', features: rings.map(x => ({type: 'Feature', properties: {c: x.m.col, t: x.m.label + ' ' + fmt(x.r)}, geometry: {type: 'Point', coordinates: [st[0], st[1] + x.r / 110540]}}))});
+  // label placement: for each ring (largest first) try angles around it until its box doesn't overlap any placed box (screen px)
+  const boxes = [], cand = [0, 35, -35, 70, -70, 110, -110, 150, -150, 180], la0 = st[1] * Math.PI / 180;
+  const labs = [...rings].sort((a, b) => b.r - a.r).map(x => { const txt = x.m.label + ' ' + fmt(x.r), w = txt.length * 7 + 8, h = 17; let pick = null;
+    for (const a of cand) { const ar = a * Math.PI / 180, ll = [st[0] + x.r * Math.sin(ar) / (111320 * Math.cos(la0)), st[1] + x.r * Math.cos(ar) / 110540], pp = m.project(ll), bx = [pp.x - w / 2, pp.y - h, pp.x + w / 2, pp.y];
+      if (!boxes.some(o => bx[0] < o[2] && bx[2] > o[0] && bx[1] < o[3] && bx[3] > o[1])) { boxes.push(bx); pick = ll; break; } }
+    return pick ? {type: 'Feature', properties: {c: x.m.col, t: txt}, geometry: {type: 'Point', coordinates: pick}} : null; }).filter(Boolean);
+  m.getSource('zl').setData({type: 'FeatureCollection', features: labs});
   const world = [[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]];
   m.getSource('zmask').setData({type: 'Feature', properties: {}, geometry: {type: 'Polygon', coordinates: rings.length && Z.mode !== 'soon' ? [world, [...rings[0].poly].reverse()] : [world]}});
   if (Z.mode === 'soon') m.getSource('zl').setData(EMPTY);
@@ -787,7 +831,25 @@ function zoneTick() {
   }
 }
 setInterval(zoneTick, 1000);
-document.querySelectorAll('.ztabs button').forEach(b => b.addEventListener('click', () => { Z.mode = b.dataset.z; Z.soonAt = 0; document.querySelectorAll('.ztabs button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); zoneTick(); }));
+/* Time map: a radial cartogram centred on you. Angle = the real compass direction of each stop;
+   radius = minutes until you could be on board there (walk + platform + wait for the first departure you can make).
+   Grey dots show where the stops really are, so you can see how time bends the map. */
+function timeMap(now) {
+  const box = $('#tmap'); if (!box || box.hidden) return;
+  const me = coach.pos || cfg.home, ps = cfg.places.concat(demo ? demoPlaces : []).filter(p => p.lat);
+  if (!me || !ps.length) { box.innerHTML = '<p class="zcap">Set your home in Setup to see the time map.</p>'; return; }
+  const R = 140, cx = 160, cy = 160, items = ps.map(p => { const st = [p.lon, p.lat], walk = modeSecs(p, 'walk'), arr = now + (walk + cfg.buffer) * 1000; const d = deps.find(x => x.placeId === p.id && !x.cancelled && x.t >= arr); const mins = d ? (d.t - now) / 60000 : null; return {p, d, mins, brg: brgTo(me, st), dist: havM(me, st)}; });
+  const maxM = Math.max(20, ...items.map(i => i.mins || 0)), maxD = Math.max(...items.map(i => i.dist)), rr = mm => Math.sqrt(mm / maxM) * R;
+  const pt = (b, r) => [cx + r * Math.sin(b * Math.PI / 180), cy - r * Math.cos(b * Math.PI / 180)];
+  const rings = [5, 10, 20, 40].filter(m => m <= maxM * 1.05).map(m => `<circle cx="${cx}" cy="${cy}" r="${rr(m)}" fill="none" stroke="var(--hair)"/><text x="${cx + 3}" y="${cy - rr(m) - 3}" class="tml">${m} min</text>`).join('');
+  const nodes = items.map(i => { const g = pt(i.brg, i.dist / maxD * R), sid = 'tm' + i.p.id; if (i.mins == null) return `<circle cx="${g[0]}" cy="${g[1]}" r="3" fill="var(--muted)"/>`; const r = spring(sid, rr(i.mins), 0.25), q = pt(i.brg, r), c = readable(i.d.colour)?.bg || i.d.colour;
+    return `<line x1="${g[0]}" y1="${g[1]}" x2="${q[0]}" y2="${q[1]}" stroke="var(--muted)" stroke-dasharray="2 3"/><circle cx="${g[0]}" cy="${g[1]}" r="3" fill="var(--muted)"/><circle cx="${q[0]}" cy="${q[1]}" r="8" fill="${c}" stroke="var(--bg)" stroke-width="2"/><text x="${q[0] + 11}" y="${q[1] + 4}" class="tmt">${esc(i.p.name)} <tspan class="tms">${Math.round(i.mins)} min, ${hhmm(i.d.t)}</tspan></text>`; }).join('');
+  const best = items.filter(i => i.mins != null).sort((a, b) => a.mins - b.mins)[0];
+  box.innerHTML = `<svg viewBox="0 0 320 320" role="img" aria-label="Time map: stops placed by minutes until you can be on board">${rings}<circle cx="${cx}" cy="${cy}" r="6" fill="#2f6fde" stroke="var(--bg)" stroke-width="3"/>${nodes}</svg>
+    <p class="zcap">Distance from the centre is <b>time</b>, not metres: how long until you're on board at each stop. Grey dots show where they really are.${best ? ` Closest in time right now: <b>${esc(best.p.name)}</b>, ${Math.round(best.mins)} min.` : ''}</p>`;
+}
+setInterval(() => timeMap(Date.now()), 1000);
+document.querySelectorAll('.ztabs button').forEach(b => b.addEventListener('click', () => { Z.mode = b.dataset.z; Z.soonAt = 0; $('#tmap').hidden = Z.mode !== 'time'; $('#zmap').style.display = Z.mode === 'time' ? 'none' : ''; $('#zcap').style.display = Z.mode === 'time' ? 'none' : ''; timeMap(Date.now()); document.querySelectorAll('.ztabs button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); zoneTick(); }));
 
 /* Where-to route map: the journey draws itself leg by leg in line colours, once, when the plan appears */
 const RM = {map: null, raf: 0};
@@ -1274,6 +1336,8 @@ function drawStory() {
     Object.entries(days).map(([k, list]) => `<h3>${esc(k)}</h3><ol class="tl">${list.map(s => `<li><span class="tt">${hhmm(s.at - s.mins * 60000)}</span><span><b>${verb[s.mode] || 'Went'} to ${esc(s.place)}</b> in ${Math.round(s.mins)} min${s.line ? `, caught the ${s.dep ? hhmm(s.dep) + ' ' : ''}${esc(s.line)}` : ''}${s.saved >= 1 ? `<br><small class="g">${Math.round(s.saved)} min faster than walking</small>` : ''}<br><small class="note">${Math.round(kcal(s))} kcal${s.dist ? ', ' + (s.dist >= 1000 ? (s.dist / 1000).toFixed(1) + ' km' : s.dist + ' m') : ''}</small></span></li>`).join('')}</ol>`).join('');
 }
 drawStory();
+new IntersectionObserver(es => { const tb = $('#thumb'), vis = es[0].isIntersecting; tb.hidden = vis || !$('#goBtn') || !!trip; }, {threshold: 0.15}).observe($('#hero'));
+$('#thGo').addEventListener('click', () => $('#goBtn')?.click());
 drawMoney();
 const startPoll = () => { clearInterval(poll); poll = setInterval(() => { if (!document.hidden) refresh(); }, 25000); };
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });

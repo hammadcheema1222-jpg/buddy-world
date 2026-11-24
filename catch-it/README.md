@@ -11,6 +11,7 @@
 | `station.html` Station | Entrance-to-platform time from OpenStreetMap indoor data: quickest, step-free or no-lift routes, crowd-adjusted walking speed, live TfL lift problems |
 
 ## Making the train
+- **Maths for design**: greedy collision-free label placement on the rings; WCAG contrast (L₁+0.05)/(L₂+0.05) with an OKLCH lightness search so every line colour stays readable; ±2σ uncertainty clouds from the Kalman variance; a Sarkar–Brown fisheye (d+1)x/(dx+1) on the next-hour strip; Pareto filtering of dominated departures; critically damped springs (c = 2√k) for motion; a Fitts's-law thumb bar; and a radial **Time map** cartogram (angle = real direction, radius = minutes until you're on board).
 - **Physics of getting there**: live wind (Open-Meteo) in a power balance c·v + ½ρ·CdA·(v+w)²·v = P; hills with Tobler's hiking function e^(−3.5·|grade+0.05|) and climbing force for bikes; Riegel's tiredness law for longer runs. The catch rings bend with the wind.
 - **Learns each train**: Welford running stats of "real departure − first shown" and (with Darwin) lateness vs timetable, per stop/line/weekday/hour, shrunk toward zero with a 3-sighting prior. You see things like "usually 2 min late".
 - **Soonest stop map**: a live time-based Voronoi map that colours every spot by the stop that gets you onto something soonest if you walk from there.

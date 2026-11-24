@@ -212,3 +212,13 @@ button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{ou
 .ztabs{display:grid;grid-template-columns:1fr 1fr;gap:2px;background:var(--fill);border-radius:999px;padding:4px;margin:10px 10px 8px}
 .ztabs button{min-height:36px;font-size:14px;color:var(--muted)}.ztabs button[aria-pressed=true]{background:var(--bg);color:var(--ink);box-shadow:0 1px 4px rgba(22,24,29,.12)}
 .sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin:0 4px 0 8px;vertical-align:-1px}
+/* uncertainty cloud: ±2σ, soft at the edges */
+.track .cloud{position:absolute;top:8px;height:12px;border-radius:999px;background:radial-gradient(closest-side,color-mix(in srgb,var(--c) 45%,transparent),transparent);pointer-events:none}
+.lane .cloud{position:absolute;top:10px;height:26px;border-radius:999px;background:radial-gradient(closest-side,color-mix(in srgb,var(--c) 38%,transparent),transparent);pointer-events:none}
+.ztabs{grid-template-columns:repeat(3,1fr)}
+#tmap svg{display:block;width:100%;max-width:360px;margin:4px auto 0}
+.tml{font-size:9px;fill:var(--muted)}.tmt{font-size:11px;font-weight:600;fill:var(--ink)}.tms{font-weight:400;fill:var(--soft)}
+.thumb{position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom));z-index:25;display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--ink);color:var(--bg);border-radius:999px;padding:6px 6px 6px 20px;box-shadow:var(--float)}
+.thumb[hidden]{display:none}
+.thumb span{font-weight:500}.thumb button{background:var(--bg);color:var(--ink);padding:0 20px}
+@media (min-width:701px){.thumb{bottom:20px;left:50%;right:auto;transform:translateX(-50%);width:min(560px,calc(100% - 24px))}}
