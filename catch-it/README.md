@@ -10,6 +10,12 @@
 | `map.html` Map | Map, Satellite or 3D world (satellite imagery + real terrain + 3D buildings + real-time sky). Every live bus and train as a 3D model on its real road or OpenStreetMap track. Ride a real vehicle live (outside chase cam or left/right/front window) or a fast preview; which side to sit on (sun glare + parks and water) |
 | `station.html` Station | Entrance-to-platform time from OpenStreetMap indoor data: quickest, step-free or no-lift routes, crowd-adjusted walking speed, live TfL lift problems |
 
+## Making the train
+- **Live run coach**: tap "I'm going" and GPS follows your real pace. Needed speed = distance left (straight line × 1.3 street detour) ÷ time left (departure − now − platform walk − buffer). Your chance = Φ(slack ÷ σ), where σ = 15% of your ETA + 15 s. The phone speaks and buzzes "speed up", "keep this pace" or "you've got it, ease off", and the screen stays awake. If you miss it, it names the next train you can still catch.
+- **Ask a friend for a lift**: one tap shares a message with the exact pick-up time, worked out from the live departure and the drive time.
+- **Delay money**: every train you catch is logged. Pick where you got off and the live expected time there estimates your lateness, or tap how late you were. It shows what you're owed: Greater Anglia Delay Repay pays 25%, 50% or 100% of a single for 15, 30 or 60 minutes late; the Elizabeth line refunds a single for 30+ minutes within TfL's control. Both have a 28-day claim deadline, and there's a copy-ready summary for the claim form.
+- **Best carriage** (Station page): your fastest route's arrival point is projected onto the platform's centre line, so you know which carriage to stand at, and which one to ride in to step off right by the exit.
+
 ## The real 3D world (map → 3D world)
 - **Buildings from OpenStreetMap** (via Overpass), built in Three.js from their true footprints. Curved outlines stay curved, and courtyards stay hollow. Height comes from `height`, or `building:levels` × 3.2 m.
 - **Real roof shapes** from `roof:shape`: dome/onion (rings scaled by cos θ, lifted by sin θ, which is how the O2's dome is drawn), gabled, hipped, mansard, pyramidal, cone and skillion (which follows `roof:direction`). Untagged UK houses get a gabled or hipped roof.

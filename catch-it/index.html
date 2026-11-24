@@ -43,6 +43,19 @@ input,select{min-height:44px;border-radius:10px;border:1px solid var(--line);bac
 .hero button{background:transparent;color:#fff;border-color:rgba(255,255,255,.35)}
 .hero button.main{background:#fff;color:var(--hero);border-color:#fff}
 .hero.calm{background:var(--panel);color:var(--ink)}.hero.calm button{color:var(--ink);border-color:var(--line)}
+.coach{margin-top:12px;border-radius:22px;padding:16px;color:#fff;background:#14162b;transition:background .4s}
+.coach.ok{background:#0c5e40}.coach.tight{background:#7a5410}.coach.behind{background:#8f1d2c}.coach.gone{background:#3b3f5c}
+.coach .say{font-size:clamp(26px,7vw,36px);font-weight:800;line-height:1.05;margin:4px 0 10px;letter-spacing:-.01em}
+.coach .nums{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0 12px}
+.coach .nums div{background:rgba(255,255,255,.12);border-radius:12px;padding:6px 8px}.coach .nums b{display:block;font-size:20px}.coach .nums small{font-size:11px;opacity:.8;font-weight:600}
+.coach .acts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}.coach button{background:transparent;color:#fff;border-color:rgba(255,255,255,.4)}.coach button.main{background:#fff;color:#14162b;grid-column:1/-1;min-height:50px}
+.coach .meter{height:10px;border-radius:5px;background:rgba(255,255,255,.18);overflow:hidden}.coach .meter i{display:block;height:100%;background:#fff;transition:width .6s}
+.money{margin-top:26px;border:1px solid var(--line);border-radius:18px;padding:14px}
+.money h2{margin:0;font-size:20px}.money .tot{font-size:30px;font-weight:800;color:var(--go)}
+.jr{border-top:1px solid var(--line);padding:10px 0;display:grid;gap:6px}
+.jr .qs{display:flex;gap:6px;flex-wrap:wrap}.jr .qs button{min-height:36px;padding:0 10px;font-size:14px}.jr .qs button[aria-pressed=true]{background:var(--ink);color:var(--bg)}
+.jr .owed{font-weight:800}.jr input{width:90px;min-height:36px}
+.carbox{display:flex;gap:3px;margin:8px 0}.carbox span{flex:1;height:30px;border-radius:6px;background:var(--panel);display:grid;place-items:center;font-size:12px;font-weight:800}.carbox span.hit{background:var(--go);color:#fff}
 .trip{margin-top:12px;border:2px dashed #6950a1;border-radius:14px;padding:12px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .trip b{font-size:22px}
 .legend{display:flex;gap:14px;flex-wrap:wrap;color:var(--muted);font-size:13px;margin:18px 2px 6px}
@@ -179,6 +192,7 @@ details summary{cursor:pointer;font-weight:600;margin:10px 0}
   <p class="lbl" id="boardLbl">Everything you can catch</p>
   <div class="legend" id="legend"></div>
   <section id="board" aria-live="polite"></section>
+  <section class="money" id="money" hidden></section>
   <p class="note" id="foot"></p>
 </main>
 
@@ -346,7 +360,7 @@ async function weather() {
 function makeDemo() {
   const now = Date.now();
   if (!cfg.places.some(p => p.id === 'demo1')) {
-    demoPlaces = [{id:'demo1', name:'Demo station', walk:9, platform:2, modes:{walk:true,run:true,bike:true,lift:true}}, {id:'demo2', name:'Demo bus stop', walk:3, platform:0.5, modes:{walk:true,run:true,bike:false,lift:false}}];
+    demoPlaces = [{id:'demo1', name:'Demo station', walk:9, platform:2, lat:51.5748, lon:0.1832, modes:{walk:true,run:true,bike:true,lift:true}}, {id:'demo2', name:'Demo bus stop', walk:3, platform:0.5, modes:{walk:true,run:true,bike:false,lift:false}}];
   }
   if (!demoSeed.length) {
     const base = [[4,'Elizabeth','elizabeth','Heathrow Terminal 5','Platform 4',1],[11,'Elizabeth','elizabeth','Abbey Wood','Platform 4',1],[13,'Greater Anglia','LE','London Liverpool Street','Platform 2',1],[2,'103','bus','Rainham Station','Stop E',2],[7,'175','bus','Dagenham, Ford Works','Stop E',2],[16,'Elizabeth','elizabeth','Heathrow Terminal 5','Platform 4',1],[19,'103','bus','Rainham Station','Stop E',2],[24,'Greater Anglia','LE','London Liverpool Street','Platform 2',1]];
@@ -451,10 +465,11 @@ function heroDraw(now) {
     </div>
     <p class="raceTxt" id="raceTxt"></p>
     <div class="odds"><div class="bar"><i id="prBar" style="width:${Math.round(b.pr * 100)}%;background:${ok ? '#3dd39a' : '#e0a21f'}"></i></div><span><span id="heroPr">${Math.round(b.pr * 100)}</span>% chance${demo ? ' · demo' : ''}</span></div>
-    <div class="acts"><button class="main" id="goBtn">I'm going</button><button id="remBtn">${remind ? 'Reminder set' : 'Remind me'}</button>${demo ? '<button id="exitDemo">Exit demo</button>' : ''}</div>
+    <div class="acts"><button class="main" id="goBtn">I'm going</button><button id="remBtn">${remind ? 'Reminder set' : 'Remind me'}</button>${b.m.k === 'lift' || cfg.liftOn ? '<button id="liftAsk">Ask a friend for a lift</button>' : ''}${demo ? '<button id="exitDemo">Exit demo</button>' : ''}</div>
     ${alts.length ? `<p class="lbl" style="color:inherit;opacity:.7;margin:16px 0 0">Plan B</p><div class="alts">${alts.map(o => `<button class="alt" data-k="${esc(o.x.key)}"><span><span class="pill" style="background:${o.x.colour};height:20px;font-size:11px;min-width:30px">${esc(shortLine(o.x))}</span> ${hhmm(o.x.t)}</span><small class="${o.v.cls}">${esc(o.v.txt.replace('✓ ', ''))}</small></button>`).join('')}</div>` : ''}`;
   h.dataset.key = d.key; h.dataset.m = b.m.k;
-  $('#goBtn').addEventListener('click', () => startTrip(b.p, b.m.k));
+  $('#goBtn').addEventListener('click', () => startTrip(b.p, b.m.k, b.d));
+  $('#liftAsk')?.addEventListener('click', () => askLift(b.p, b.d));
   $('#remBtn').addEventListener('click', () => setRemind(b));
   $('#exitDemo')?.addEventListener('click', exitDemo);
   h.querySelectorAll('.alt').forEach(a => a.addEventListener('click', () => { const x = deps.find(q => q.key === a.dataset.k); if (x) openDetail(x); }));
@@ -512,14 +527,26 @@ async function setRemind(b) {
   }, ms);
   heroDraw(Date.now());
 }
-function startTrip(p, m) { trip = {placeId: p.id, mode: m, start: Date.now()}; drawTrip(); }
+function startTrip(p, m, d) {
+  trip = {placeId: p.id, mode: m, start: Date.now(), key: d?.key, dep: d?.t, line: d ? shortName(d) : '', dest: d?.dest || '', colour: d?.colour};
+  if (d && d.mode !== 'bus' && !demo) logJourney(d, p);
+  coachStart(); drawTrip();
+}
 function drawTrip() {
   const box = $('#tripBox');
   if (!trip) { box.innerHTML = ''; return; }
   const p = placeOf(trip.placeId), m = MODES.find(x => x.k === trip.mode);
-  box.innerHTML = `<div class="trip"><span>Timing your ${esc(m.label.toLowerCase())} to ${esc(p?.name)}</span><b id="tripT">0:00</b><button id="onPlat">I'm on the platform</button><button id="cancelTrip">Cancel</button></div>`;
+  box.innerHTML = `<div class="coach" id="coach" aria-live="assertive">
+    <div class="top2" style="opacity:.85"><span class="pill" style="background:${trip.colour || '#6950a1'}">${esc(m.label)}</span><span>${trip.dep ? hhmm(trip.dep) + ' ' + esc(trip.line) + ' to ' + esc(trip.dest) : 'to ' + esc(p?.name)}</span></div>
+    <div class="say" id="cSay">Getting your position…</div>
+    <div class="meter"><i id="cMeter" style="width:50%"></i></div>
+    <div class="nums"><div><small>Distance</small><b id="cDist">–</b></div><div><small>Your speed</small><b id="cV">–</b></div><div><small>Needed</small><b id="cNeed">–</b></div><div><small>Chance</small><b id="cPr">–</b></div></div>
+    <div class="acts"><button class="main" id="onPlat">I'm on the platform</button><button id="cVoice" aria-pressed="${coach.voice}">${coach.voice ? 'Voice on' : 'Voice off'}</button>${trip.mode === 'lift' ? '<button id="cLift">Text a friend</button>' : `<span class="note" style="color:#fff;opacity:.8;align-self:center;text-align:center" id="tripT">0:00</span>`}<button id="cancelTrip">Cancel</button></div></div>`;
   $('#onPlat').addEventListener('click', endTrip);
-  $('#cancelTrip').addEventListener('click', () => { trip = null; drawTrip(); });
+  try { box.scrollIntoView({behavior: "smooth", block: "center"}); } catch (e) {}
+  $('#cancelTrip').addEventListener('click', () => { coachStop(); trip = null; drawTrip(); });
+  $('#cVoice').addEventListener('click', e => { coach.voice = !coach.voice; e.target.textContent = coach.voice ? 'Voice on' : 'Voice off'; try { localStorage.setItem('catchit.voice', coach.voice ? '1' : '0'); } catch (er) {} if (!coach.voice) speechSynthesis?.cancel(); });
+  $('#cLift')?.addEventListener('click', () => askLift(p, deps.find(x => x.key === trip.key)));
 }
 function endTrip() {
   const p = cfg.places.find(q => q.id === trip.placeId);
@@ -528,7 +555,116 @@ function endTrip() {
     if (trip.mode === 'lift') mins -= cfg.liftPickup;
     if (mins > 0.3 && mins < 120) { p.learned = p.learned || {}; const old = p.learned[trip.mode]; p.learned[trip.mode] = old == null ? mins : old * 0.7 + mins * 0.3; save(); }
   }
-  trip = null; drawTrip(); render();
+  coachStop(); trip = null; drawTrip(); render();
+}
+
+/* ---------- live run coach: GPS pace vs the departure, spoken and buzzed ----------
+   remaining route ≈ straight-line distance × 1.3 (typical street detour factor)
+   time left = departure − now − platform walk − safety buffer
+   needed speed = remaining / time left; your speed = smoothed GPS speed
+   chance = Φ(slack / σ), slack = time left − remaining / your speed, σ = 15% of your ETA + 15 s */
+const coach = {watch: null, pos: null, v: null, last: null, state: '', spokeAt: 0, wake: null, voice: (() => { try { return localStorage.getItem('catchit.voice') !== '0'; } catch (e) { return true; } })()};
+const DETOUR = 1.3;
+const havM = (a, b) => { const R = 6371000, r = Math.PI / 180, dLa = (b[1] - a[1]) * r, dLo = (b[0] - a[0]) * r; const x = Math.sin(dLa / 2) ** 2 + Math.cos(a[1] * r) * Math.cos(b[1] * r) * Math.sin(dLo / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(x)); };
+function coachStart() {
+  coach.pos = coach.v = coach.last = null; coach.state = ''; coach.spokeAt = 0;
+  try { navigator.wakeLock?.request('screen').then(w => coach.wake = w).catch(() => {}); } catch (e) {}
+  if (navigator.geolocation) coach.watch = navigator.geolocation.watchPosition(g => {
+    const now = Date.now(), here = [g.coords.longitude, g.coords.latitude];
+    if (coach.last) { const dt = (now - coach.last.t) / 1000, dd = havM(coach.last.p, here); if (dt > 0.8) { const cap = trip?.mode === 'lift' ? 40 : trip?.mode === 'bike' ? 15 : 9; const inst = Math.min(cap, g.coords.speed != null && g.coords.speed >= 0 ? g.coords.speed : dd / dt);  /* ignore GPS jumps faster than the mode allows */ coach.v = coach.v == null ? inst : coach.v * 0.6 + inst * 0.4; coach.last = {t: now, p: here}; } }
+    else coach.last = {t: now, p: here};
+    coach.pos = here; coach.acc = g.coords.accuracy; coach.noGps = false;
+  }, () => { coach.noGps = true; }, {enableHighAccuracy: true, maximumAge: 1000, timeout: 15000});
+}
+function coachStop() { if (coach.watch != null) navigator.geolocation.clearWatch(coach.watch); coach.watch = null; try { coach.wake?.release(); } catch (e) {} coach.wake = null; try { speechSynthesis.cancel(); } catch (e) {} }
+function say(text, buzz) {
+  try { navigator.vibrate?.(buzz); } catch (e) {}
+  if (!coach.voice || !window.speechSynthesis) return;
+  try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.lang = 'en-GB'; u.rate = 1.05; speechSynthesis.speak(u); } catch (e) {}
+}
+const kmh = v => (v * 3.6).toFixed(1);
+function coachTick(now) {
+  if (!trip || !$('#coach')) return;
+  const p = placeOf(trip.placeId), d = deps.find(x => x.key === trip.key), dep = d ? d.t : trip.dep; if (!p) return;
+  const platS = (+p.platform || 0) * 60, left = dep ? (dep - now) / 1000 - platS - cfg.buffer : null;
+  let rem = null, eta = null;
+  if (coach.pos && p.lat) { rem = havM(coach.pos, [p.lon, p.lat]) * DETOUR; if (rem < 40) rem = 0; }
+  const planned = modeSecs(p, trip.mode) - platS, elapsed = (now - trip.start) / 1000;
+  if (rem != null && coach.v != null && coach.v > 0.3) eta = rem / coach.v;
+  else if (rem != null) eta = rem / Math.max(0.5, (havM([p.lon, p.lat], coach.last?.p || [p.lon, p.lat]) * DETOUR || 1) / Math.max(1, planned));
+  else eta = Math.max(0, planned - elapsed);                                   // no GPS: follow the plan
+  if (rem === 0) eta = 0;
+  const need = rem != null && left > 0 ? rem / left : null;
+  const pr = left == null ? null : Phi((left - eta) / (0.15 * eta + 15));
+  const st = left != null && left + platS < -20 ? 'gone' : rem === 0 ? 'ok' : pr == null ? 'ok' : pr >= 0.85 ? 'ok' : pr >= 0.5 ? 'tight' : 'behind';
+  const c = $('#coach'); c.className = 'coach ' + st;
+  const words = {ok: rem === 0 ? 'You\'re here. Head for the platform.' : 'You\'ve got it. Ease off.', tight: 'Keep this pace.', behind: need ? `Speed up: ${kmh(need)} km/h.` : 'Speed up!', gone: 'Missed it.'}[st];
+  $('#cSay').textContent = words;
+  $('#cDist').textContent = rem == null ? (!p.lat ? '–' : coach.noGps ? 'no GPS' : '…') : rem >= 1000 ? (rem / 1000).toFixed(1) + ' km' : Math.round(rem) + ' m';
+  $('#cV').textContent = coach.v == null ? '–' : kmh(coach.v);
+  $('#cNeed').textContent = need == null ? '–' : need > 12 ? 'too fast' : kmh(need);
+  $('#cPr').textContent = pr == null ? '–' : Math.round(pr * 100) + '%';
+  $('#cMeter').style.width = (pr == null ? 50 : Math.round(pr * 100)) + '%';
+  const t = $('#tripT'); if (t) t.textContent = mmss(elapsed);
+  if (st !== coach.state || (st === 'behind' && now - coach.spokeAt > 20000)) {
+    if (coach.state || st !== 'ok') say(st === 'gone' ? 'Missed it. Check plan B.' : words, st === 'behind' ? [250, 120, 250, 120, 250] : st === 'tight' ? [180, 100, 180] : [90]);
+    if (st === 'gone') { const alt = deps.find(x => x.key !== trip.key && verdict(x, placeOf(x.placeId), now).cls === 'g'); if (alt) $('#cSay').textContent = `Missed it. Next you can catch: ${hhmm(alt.t)} ${shortName(alt)}.`; }
+    coach.state = st; coach.spokeAt = now;
+  }
+}
+setInterval(() => coachTick(Date.now()), 1000);
+
+/* ---------- ask a friend for a lift: exact pick-up time from the live departure ---------- */
+function askLift(p, d) {
+  if (!p) return; const now = Date.now();
+  const drive = modeSecs(p, 'lift') - cfg.liftPickup * 60, dep = d ? d.t : trip?.dep;
+  const pick = dep ? dep - (drive + cfg.buffer) * 1000 - 60000 : now + 5 * 60000;
+  const msg = `Hey, can you give me a lift to ${p.name}? ` + (dep ? `I'm trying to catch the ${hhmm(dep)} ${d ? shortName(d) : ''}${d?.dest ? ' to ' + d.dest : ''}. If you can pick me up by ${hhmm(pick)} I'll make it 🙏` : 'Leaving now 🙏');
+  if (navigator.share) navigator.share({text: msg}).catch(() => {}); else open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank', 'noopener');
+}
+
+/* ---------- delay money: spot journeys that earn compensation ----------
+   Greater Anglia Delay Repay: 15–29 min 25%, 30–59 50%, 60+ 100% of a single (claim within 28 days)
+   Elizabeth line (TfL): 30+ min, cause within TfL's control → single fare refunded (claim within 28 days) */
+const OPS = {LE: {name: 'Greater Anglia', url: 'https://www.greateranglia.co.uk/delayrepay', rate: m => m >= 60 ? 1 : m >= 30 ? 0.5 : m >= 15 ? 0.25 : 0},
+             XR: {name: 'Elizabeth line', url: 'https://tfl.gov.uk/fares/refunds-and-replacements/overground-and-tfl-rail-delays', rate: m => m >= 30 ? 1 : 0, note: 'only if the cause was within TfL\'s control'}};
+const opOf = d => d.lineId === 'LE' ? 'LE' : (d.lineId === 'XR' || d.lineId === 'elizabeth') ? 'XR' : d.lineId || 'rail';
+function logJourney(d, p) {
+  cfg.journeys = (cfg.journeys || []).filter(j => Date.now() - j.at < 40 * 864e5).slice(-60);
+  if (cfg.journeys.some(j => j.key === d.key)) return;
+  const std = d.std || hhmm(d.t), late0 = /^\d\d:\d\d$/.test(d.status || '') ? Math.max(0, Math.round((nrTime(d.status, Date.now()) - nrTime(std, Date.now())) / 60000)) : 0;
+  cfg.journeys.push({key: d.key, at: Date.now(), op: opOf(d), opName: d.line, from: p.name, dest: d.dest, std, depLate: late0, calls: (d.calls || []).slice(0, 30), got: '', late: null, fare: cfg.fare || null, claimed: false});
+  save(); drawMoney();
+}
+function estLate(j) { const c = j.calls.find(x => x.name === j.got); if (!c || !/^\d\d:\d\d$/.test(c.et || '')) return null; const [a, b] = [c.t, c.et].map(s => { const [h, m] = s.split(':'); return +h * 60 + +m; }); return Math.max(0, (b - a + 1440) % 1440); }
+function drawMoney() {
+  const box = $('#money'), js = (cfg.journeys || []).filter(j => Date.now() - j.at < 28 * 864e5 && OPS[j.op]).reverse();
+  box.hidden = !js.length; if (!js.length) return;
+  let total = 0;
+  const rows = js.map((j, i) => {
+    const o = OPS[j.op], late = j.late ?? estLate(j) ?? j.depLate, r = o.rate(late || 0), owed = j.fare ? j.fare * r : null;
+    if (owed && !j.claimed) total += owed;
+    const by = new Date(j.at + 28 * 864e5).toLocaleDateString('en-GB', {day: 'numeric', month: 'short'});
+    const date = new Date(j.at).toLocaleDateString('en-GB', {weekday: 'short', day: 'numeric', month: 'short'});
+    return `<div class="jr" data-j="${esc(j.key)}">
+      <div><b>${esc(date)} · ${esc(j.std)} ${esc(o.name)}</b> <span class="note">${esc(j.from)} → ${esc(j.dest)}</span></div>
+      ${j.calls.length ? `<label class="note">Where did you get off? <select data-f="got" style="min-height:36px;width:auto"><option value="">Choose…</option>${j.calls.map(c => `<option ${c.name === j.got ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>` : ''}
+      <div class="qs"><span class="note" style="align-self:center">Arrived late by:</span>${[[0, 'On time'], [20, '15–29 min'], [45, '30–59 min'], [70, '60+ min']].map(([v, l]) => `<button data-late="${v}" aria-pressed="${j.late === v}">${l}</button>`).join('')}</div>
+      <div class="qs" style="align-items:center"><span class="note">Single fare £</span><input data-f="fare" inputmode="decimal" value="${j.fare ?? ''}" placeholder="0.00"></div>
+      <div>${r ? `<span class="owed g">${owed != null ? `You're owed about £${owed.toFixed(2)}` : 'You can claim'} (${Math.round(r * 100)}% of your single${o.note ? ', ' + o.note : ''})</span> · claim by ${by}` : late ? `<span class="note">${late} min late: under ${o.name}'s limit</span>` : '<span class="note">Tell me how late you arrived and I\'ll work it out.</span>'}</div>
+      ${r ? `<div class="qs"><a class="cta" style="display:inline-grid;place-items:center;padding:0 14px;border-radius:10px;min-height:40px;text-decoration:none" href="${o.url}" target="_blank" rel="noopener">Claim with ${o.name}</a><button data-copy>Copy details</button><button data-claimed aria-pressed="${j.claimed}">${j.claimed ? 'Claimed ✓' : 'Mark claimed'}</button></div>` : ''}
+    </div>`;
+  }).join('');
+  box.innerHTML = `<h2>Delay money</h2><p class="note" style="margin:2px 0 6px">Trains you caught with "I'm going" in the last 28 days. Late arrivals can earn money back.</p>${total ? `<div class="tot">£${total.toFixed(2)}</div><p class="note" style="margin-top:0">waiting to be claimed</p>` : ''}${rows}`;
+  const J = k => cfg.journeys.find(j => j.key === k);
+  box.querySelectorAll('.jr').forEach(el => {
+    const j = J(el.dataset.j); if (!j) return;
+    el.querySelectorAll('[data-late]').forEach(b => b.addEventListener('click', () => { j.late = +b.dataset.late; save(); drawMoney(); }));
+    el.querySelector('[data-f=got]')?.addEventListener('change', e => { j.got = e.target.value; const l = estLate(j); if (l != null && j.late == null) j.late = l; save(); drawMoney(); });
+    el.querySelector('[data-f=fare]')?.addEventListener('change', e => { const v = parseFloat(e.target.value); j.fare = isFinite(v) ? v : null; if (isFinite(v)) cfg.fare = v; save(); drawMoney(); });
+    el.querySelector('[data-claimed]')?.addEventListener('click', () => { j.claimed = !j.claimed; save(); drawMoney(); });
+    el.querySelector('[data-copy]')?.addEventListener('click', e => { const txt = `Date: ${new Date(j.at).toLocaleDateString('en-GB')}\nTrain: ${j.std} ${OPS[j.op].name}\nFrom: ${j.from}\nTo: ${j.got || j.dest}\nDelay at arrival: about ${j.late ?? estLate(j) ?? j.depLate} minutes${j.fare ? '\nSingle fare: £' + j.fare.toFixed(2) : ''}`; navigator.clipboard?.writeText(txt).then(() => { e.target.textContent = 'Copied ✓'; }).catch(() => {}); });
+  });
 }
 
 /* ---------- detail drawer ---------- */
@@ -730,6 +866,7 @@ liftBtn.addEventListener('click', () => { cfg.liftOn = !cfg.liftOn; save(); sync
 syncLift();
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeDetail(); if ($('#setup').classList.contains('open')) closeSetup(); } });
 let poll = null;
+drawMoney();
 const startPoll = () => { clearInterval(poll); poll = setInterval(() => { if (!document.hidden) refresh(); }, 25000); };
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
 refresh(); weather(); startPoll(); setInterval(weather, 600000);

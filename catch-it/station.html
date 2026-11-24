@@ -51,6 +51,7 @@ input[type=range]{width:100%;accent-color:#6950a1}
 .empty{padding:40px;text-align:center;color:var(--muted)}
 @media(max-width:800px){.layout{grid-template-columns:1fr}nav a{padding:8px}.logo span{display:none}}
 @media(prefers-reduced-motion:reduce){.flow{animation:none}}
+.carbox{display:flex;gap:3px;margin:8px 0}.carbox span{flex:1;height:30px;border-radius:6px;background:var(--panel);display:grid;place-items:center;font-size:12px;font-weight:800}.carbox span.hit{background:var(--go);color:#fff}
 </style>
 </head>
 <body>
@@ -88,7 +89,7 @@ let data = null, G = null, sel = null, lifts = [];
 $('#st').innerHTML = places.length ? places.map((p, i) => `<option value="${i}">${esc(p.name)}</option>`).join('') : '<option>No stations yet: add them on the Board</option>';
 
 async function overpass(q) {
-  for (const host of ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter']) {
+  for (const host of ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter']) {
     try { const r = await fetch(host, {method: 'POST', body: 'data=' + encodeURIComponent(q), headers: {'Content-Type': 'application/x-www-form-urlencoded'}, signal: AbortSignal.timeout(25000)}); if (r.ok) return r.json(); } catch (e) {}
   }
   throw new Error('OpenStreetMap server busy, try again in a minute');
@@ -169,11 +170,34 @@ function solve() {
   draw(path, res);
   $('#answers').innerHTML = !G.platforms.length ? '<p>No platforms are mapped here in OpenStreetMap yet.</p>' : `
     ${chosen?.secs != null ? `<p class="note">${esc(chosen.pl.name)}</p><div class="big">${mmss(chosen.secs)}</div><p class="note">from ${esc(start.name)} at ${v.toFixed(2)} m/s walking speed${mode !== 'any' ? ', ' + $('#mode').selectedOptions[0].text.toLowerCase() : ''}</p><button id="useT">Use ${Math.ceil(chosen.secs / 60)} min as this station's entrance-to-platform time</button>` : '<p>No route found with these settings.</p>'}
+    ${carHtml(chosen, path)}
     <h3>Every platform</h3><table><tbody>${res.map(r => `<tr data-id="${r.pl.id}" class="${r.pl.id === sel ? 'sel' : ''}"><td>${esc(r.pl.name)}</td><td class="n">${r.secs == null ? 'no route' : mmss(r.secs)}</td></tr>`).join('')}</tbody></table>
     <p class="note">Stairs are walked at about 45% of flat speed plus a few seconds; each lift adds a 45 s wait. Crowding slows everyone (Weidmann).</p>`;
   $('#answers').querySelectorAll('tr[data-id]').forEach(tr => tr.addEventListener('click', () => { sel = +tr.dataset.id; solve(); }));
   $('#useT')?.addEventListener('click', () => { try { const s = JSON.parse(localStorage.getItem('catchit.v1') || '{}'); const pl = (s.places || []).find(x => x.id === G.place.id); if (pl) { pl.platform = Math.ceil(chosen.secs / 60); localStorage.setItem('catchit.v1', JSON.stringify(s)); $('#useT').textContent = 'Saved to the Board'; } } catch (e) {} });
 }
+/* ---------- best carriage: where your route meets the platform, as a fraction of its length ----------
+   project the arrival point onto the platform's centre line (or its long axis if mapped as an area),
+   assume the train fills the platform, carriage = ⌈fraction × carriages⌉ counted from the named end */
+function carHtml(chosen, path) {
+  if (!chosen || chosen.secs == null || !path.length) return '';
+  const N = G.nodes, ll = chosen.pl.nodes.map(n => N[n]).filter(Boolean); if (ll.length < 2) return '';
+  const lat0 = ll[0].lat, kx = Math.cos(lat0 * DEG) * 111320, ky = 110540, P = n => [(n.lon - ll[0].lon) * kx, (n.lat - lat0) * ky];
+  let line = ll.map(P);
+  if (chosen.pl.nodes[0] === chosen.pl.nodes.at(-1)) { let a = 0, b = 0, best = 0; for (let i = 0; i < line.length; i++) for (let j = i + 1; j < line.length; j++) { const d = Math.hypot(line[i][0] - line[j][0], line[i][1] - line[j][1]); if (d > best) { best = d; a = i; b = j; } } line = [line[a], line[b]]; }
+  const q = P(N[path.at(-1)]); let acc = 0, at = 0, bestD = Infinity, L = 0;
+  for (let i = 1; i < line.length; i++) { const [x1, y1] = line[i - 1], [x2, y2] = line[i], dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy) || 1e-9; const u = Math.max(0, Math.min(1, ((q[0] - x1) * dx + (q[1] - y1) * dy) / (len * len))); const d = Math.hypot(x1 + u * dx - q[0], y1 + u * dy - q[1]); if (d < bestD) { bestD = d; at = acc + u * len; } acc += len; }
+  L = acc; if (L < 40) return '';
+  const e = line.at(-1), s = line[0], brg = (Math.atan2(e[0] - s[0], e[1] - s[1]) * 180 / Math.PI + 360) % 360;
+  const dir = b => ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'][Math.round(b / 45) % 8];
+  const endA = dir((brg + 180) % 360), endB = dir(brg), cars = +(localStorage.getItem('catchit.cars') || 9), f = at / L, k = Math.min(cars, Math.max(1, Math.ceil(f * cars)));
+  return `<h3>Best carriage</h3><p class="note" style="margin:0">Your route reaches ${esc(chosen.pl.name)} about ${Math.round(at)} m from its ${endA} end (platform ≈ ${Math.round(L)} m).</p>
+    <div class="carbox" aria-label="Train diagram">${Array.from({length: cars}, (_, i) => `<span class="${i + 1 === k ? 'hit' : ''}">${i + 1}</span>`).join('')}</div>
+    <div class="note" style="display:flex;justify-content:space-between"><span>← ${endA} end</span><span>${endB} end →</span></div>
+    <p style="margin:6px 0"><b>Stand at carriage ${k} of ${cars}</b>, counting from the ${endA} end. Getting off here? Ride in carriage ${k} and you step out right by this way out.</p>
+    <label class="note">Train length <select id="cars" style="width:auto;min-height:36px">${[4, 5, 6, 8, 9, 10, 12].map(n => `<option ${n === cars ? 'selected' : ''}>${n}</option>`).join('')}</select> carriages (Elizabeth line 9, Greater Anglia often 8 or 12)</label>`;
+}
+document.addEventListener('change', e => { if (e.target.id === 'cars') { try { localStorage.setItem('catchit.cars', e.target.value); } catch (er) {} solve(); } });
 let walker = null;
 function draw(path, res) {
   const N = G.nodes, ids = new Set(); G.edges.forEach(e => { ids.add(e.a); ids.add(e.b); }); G.allPlatforms.forEach(pl => pl.nodes.forEach(n => ids.add(n)));

@@ -208,7 +208,7 @@
     return els.length ? {elements: els} : null;
   }
   async function overpass(q) {
-    for (const host of ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter']) {
+    for (const host of ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter']) {
       try { const r = await fetch(host, {method: 'POST', body: 'data=' + encodeURIComponent(q), headers: {'Content-Type': 'application/x-www-form-urlencoded'}, signal: AbortSignal.timeout(20000)}); if (r.ok) return r.json(); } catch (e) {}
     }
     throw new Error('OpenStreetMap server busy');
