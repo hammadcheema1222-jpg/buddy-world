@@ -177,3 +177,29 @@ button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{ou
 .controls label{font-weight:600;color:var(--soft)}
 
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+/* Dark Sky-style next hour */
+.sum{margin:26px 2px 8px;font-size:17px;line-height:1.4;color:var(--ink)}
+.sum b{font-weight:600}
+.strip{position:relative;height:46px;margin:0 2px 4px}
+.strip .sl{position:absolute;left:0;right:0;top:16px;height:1px;background:var(--hair)}
+.strip .sx{position:absolute;top:30px;font-size:11px;color:var(--muted);transform:translateX(-50%);white-space:nowrap}
+.strip .sx:first-of-type{transform:none}.strip .sx:last-of-type{transform:translateX(-100%)}
+.strip .tk{position:absolute;top:10px;width:4px;height:13px;border-radius:2px;transform:translateX(-50%);opacity:.22;transition:left 2s linear,opacity .3s}
+.strip .tk.can{opacity:1}
+.strip .tk.best{height:20px;top:6px;width:6px;border-radius:3px;box-shadow:0 0 0 2px var(--bg),0 0 0 3px var(--ink)}
+/* Moves-style storyline */
+.story{border-top:1px solid var(--hair);margin-top:34px;padding-top:24px}
+.story h2{font-weight:300;font-size:28px;letter-spacing:-.03em;margin:0}
+.story .big2{color:var(--soft);margin:4px 0 8px}
+.story h3{font-size:14px;color:var(--muted);font-weight:600;margin:18px 0 6px}
+.tl{list-style:none;margin:0 0 0 6px;padding:0 0 0 16px;border-left:1px solid var(--hair)}
+.tl li{position:relative;display:grid;grid-template-columns:54px 1fr;gap:8px;padding:8px 0}
+.tl li::before{content:"";position:absolute;left:-21px;top:15px;width:9px;height:9px;border-radius:50%;background:var(--bg);box-shadow:0 0 0 1.5px var(--ink)}
+.tl .tt{color:var(--muted);font-weight:500}
+/* Google Now-style auto card + Inbox-style bundle */
+.auto{display:inline-block;margin:0 0 6px;font-size:13px;font-weight:600;color:var(--soft);background:var(--fill);border-radius:999px;padding:3px 10px}
+.steps summary{cursor:pointer;color:var(--soft);font-size:14px;font-weight:600;margin:4px 0}
+.steps ol{list-style:none;margin:6px 0 8px;padding:0 0 0 12px;border-left:1px solid var(--hair)}
+.steps li{position:relative;display:flex;gap:8px;padding:5px 0;font-size:15px}
+.steps li i{position:absolute;left:-17px;top:10px;width:9px;height:9px;border-radius:50%}

@@ -199,7 +199,7 @@ details summary{cursor:pointer;font-weight:600;margin:10px 0}
 @media(prefers-reduced-motion:reduce){.busnow{transition:none}}
 </style>
 <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="ui.css?v=1795555058">
+<link rel="stylesheet" href="ui.css?v=1795555547">
 </head>
 <body class="tabs">
 <div class="top">
@@ -219,6 +219,8 @@ details summary{cursor:pointer;font-weight:600;margin:10px 0}
     <div class="wchips" id="wChips"></div>
     <div id="wRes"></div>
   </section>
+  <p class="sum" id="sum"></p>
+  <div class="strip" id="strip" aria-hidden="true"></div>
   <section id="hero" class="call calm" aria-live="polite"></section>
   <div class="zone" id="zone" hidden><div id="zmap" role="img" aria-label="Catch zone map: how far from the station you could be and still make this departure"></div><p class="zcap" id="zcap"></p><p class="mcred">Map © OpenFreeMap, © OpenStreetMap contributors</p></div>
   <div id="tripBox"></div>
@@ -226,6 +228,7 @@ details summary{cursor:pointer;font-weight:600;margin:10px 0}
   <p class="lbl" id="boardLbl">Everything you can catch</p>
   <div class="legend" id="legend"></div>
   <section id="board" aria-live="polite"></section>
+  <section class="story" id="story" hidden></section>
   <section class="money" id="money" hidden></section>
   <p class="note" id="foot"></p>
 </main>
@@ -409,10 +412,30 @@ const placeOf = id => id === 'jp' ? jpPlace : cfg.places.find(p => p.id === id) 
 let jpPlace = null;
 
 /* ---------- best option ---------- */
+/* Inbox-style snooze: hide this departure from the call and show the next one (this session only) */
+const snoozed = new Set((() => { try { return JSON.parse(sessionStorage.getItem('catchit.snooze') || '[]'); } catch (e) { return []; } })());
+function snooze(k) { snoozed.add(k); try { sessionStorage.setItem('catchit.snooze', JSON.stringify([...snoozed])); } catch (e) {} heroDraw(Date.now()); drawSummary(Date.now()); }
+
+/* Dark Sky-style: one plain sentence for the next hour, and a 60-minute strip where each departure is a mark */
+const verbOf = k => ({run: 'run', bike: 'cycle', lift: 'get a lift', walk: 'walk'})[k];
+function nextHour(now) { return deps.filter(d => !d.cancelled && d.t > now && d.t - now < 3600e3).map(d => { const p = placeOf(d.placeId); return {d, v: p ? verdict(d, p, now) : {cls: 'n'}}; }); }
+function drawSummary(now) {
+  const el = $('#sum'), st = $('#strip'); if (!el) return;
+  if (!deps.length) { el.textContent = ''; st.innerHTML = ''; st.hidden = true; return; }
+  const L = nextHour(now), ok = L.filter(x => x.v.cls === 'g' || x.v.cls === 'a'), b = best(now);
+  el.innerHTML = ok.length && b ? `<b>Next hour:</b> ${ok.length} ${ok.length === 1 ? 'departure' : 'departures'} you can still catch. The best is the ${hhmm(b.d.t)} ${esc(shortName(b.d))}${b.m.k !== 'walk' ? ' if you ' + verbOf(b.m.k) : ''}.` : '<b>Next hour:</b> nothing you can still catch from here. Try Where to? for another way.';
+  st.hidden = false;
+  if (!st.dataset.built) { st.dataset.built = '1'; st.innerHTML = '<i class="sl"></i>' + [0, 15, 30, 45, 60].map(m => `<span class="sx" style="left:${m / 60 * 100}%">${m ? m + ' min' : 'now'}</span>`).join('') + '<div class="sm" id="sm"></div>'; }
+  const sm = $('#sm'), have = new Set();
+  L.forEach(x => { const id = 'tk-' + x.d.key.replace(/[^\w-]/g, '_'); have.add(id); let e = document.getElementById(id); if (!e) { e = document.createElement('span'); e.id = id; e.className = 'tk'; sm.appendChild(e); }
+    const can = x.v.cls === 'g' || x.v.cls === 'a'; e.style.left = ((x.d.t - now) / 3600e3 * 100) + '%'; e.style.background = x.d.colour; e.classList.toggle('can', can); e.classList.toggle('best', !!b && b.d.key === x.d.key); e.title = `${hhmm(x.d.t)} ${shortName(x.d)}: ${x.v.txt || ''}`; });
+  sm.querySelectorAll('.tk').forEach(e => { if (!have.has(e.id)) e.remove(); });
+}
+
 function best(now) {
   let pick = null, fallback = null;
   for (const d of deps) {
-    const p = placeOf(d.placeId); if (!p || d.cancelled) continue;
+    const p = placeOf(d.placeId); if (!p || d.cancelled || snoozed.has(d.key)) continue;
     for (const m of modesFor(p)) {
       const pr = chance(d, p, m.k, now), li = leaveIn(d, p, m.k, now);
       if (pr >= cfg.want && li >= -5) { if (!pick || d.t < pick.d.t) pick = {d, p, m, pr, li}; break; }
@@ -457,7 +480,7 @@ function render() {
   }
   for (const k in refs) delete refs[k];
   deps.forEach((d, i) => { refs[i] = {w: board.querySelector(`[data-w="${i}"]`), t: board.querySelector(`[data-t="${i}"]`), c: board.querySelector(`[data-c="${i}"]`)}; });
-  chips(now); heroDraw(now); foot();
+  chips(now); heroDraw(now); foot(); drawSummary(now);
 }
 const scale = s => Math.max(0, Math.min(1, Math.sqrt(Math.max(0, s) / (cfg.window * 60)))) * 100; // square-root time: near minutes get more room
 const ticks = () => [5, 10, 20, 30].filter(m => m < cfg.window).map(m => `<span class="tick" style="left:${scale(m * 60)}%">${m} min</span>`).join('');
@@ -501,12 +524,13 @@ function heroDraw(now) {
     </div>
     <p class="raceTxt" id="raceTxt"></p>
     <div class="odds"><div class="bar"><i id="prBar" style="width:${Math.round(b.pr * 100)}%;background:${ok ? '#3dd39a' : '#e0a21f'}"></i></div><span><span id="heroPr">${Math.round(b.pr * 100)}</span>% chance${demo ? ' (demo)' : ''}</span></div>
-    <div class="acts"><button class="main" id="goBtn">I'm going</button><button id="remBtn">${remind ? 'Reminder set' : 'Remind me'}</button>${b.m.k === 'lift' || cfg.liftOn ? '<button id="liftAsk">Ask a friend for a lift</button>' : ''}${demo ? '<button id="exitDemo">Exit demo</button>' : ''}</div>
+    <div class="acts"><button class="main" id="goBtn">I'm going</button><button id="remBtn">${remind ? 'Reminder set' : 'Remind me'}</button><button id="snzBtn" title="Hide this one and show the next">Snooze</button>${b.m.k === 'lift' || cfg.liftOn ? '<button id="liftAsk">Ask a friend for a lift</button>' : ''}${demo ? '<button id="exitDemo">Exit demo</button>' : ''}</div>
     ${alts.length ? `<p class="lbl" style="color:inherit;opacity:.7;margin:16px 0 0">Plan B</p><div class="alts">${alts.map(o => `<button class="alt" data-k="${esc(o.x.key)}"><span><span class="pill" style="background:${o.x.colour};height:20px;font-size:11px;min-width:30px">${esc(shortLine(o.x))}</span> ${hhmm(o.x.t)}</span><small class="${o.v.cls}">${esc(o.v.txt.replace('✓ ', ''))}</small></button>`).join('')}</div>` : ''}`;
   h.dataset.key = d.key; h.dataset.m = b.m.k;
   $('#goBtn').addEventListener('click', () => startTrip(b.p, b.m.k, b.d));
   $('#liftAsk')?.addEventListener('click', () => askLift(b.p, b.d));
   $('#remBtn').addEventListener('click', () => setRemind(b));
+  $('#snzBtn')?.addEventListener('click', () => snooze(b.d.key));
   $('#exitDemo')?.addEventListener('click', exitDemo);
   h.querySelectorAll('.alt').forEach(a => a.addEventListener('click', () => { const x = deps.find(q => q.key === a.dataset.k); if (x) openDetail(x); }));
 }
@@ -546,7 +570,7 @@ function frame(ts) {
     $('#raceTxt').textContent = `If you left now: you reach the platform in ${mmss(T)}, the ${d.mode === 'bus' ? 'bus' : 'train'} leaves in ${mmss(S)}.` + (T < S ? ` ${mmss(S - T)} to spare.` : ' Too tight, it would beat you.');
   }
   if (trip) { const el = $('#tripT'); if (el) el.textContent = mmss((now - trip.start) / 1000); }
-  if (now - lastChip > 2000) { lastChip = now; chips(now); foot(); const b = best(now); if (b && h.dataset.key !== b.d.key) heroDraw(now); }
+  if (now - lastChip > 2000) { lastChip = now; chips(now); foot(); drawSummary(now); const b = best(now); if (b && h.dataset.key !== b.d.key) heroDraw(now); }
   requestAnimationFrame(frame);
 }
 
@@ -585,13 +609,14 @@ function drawTrip() {
   $('#cLift')?.addEventListener('click', () => askLift(p, deps.find(x => x.key === trip.key)));
 }
 function endTrip() {
+  { const p0 = placeOf(trip.placeId); if (p0) { const mins = (Date.now() - trip.start) / 60000, walk = modeSecs(p0, 'walk') / 60; cfg.story = [...(cfg.story || []).filter(s => Date.now() - s.at < 30 * 864e5), {at: Date.now(), place: p0.name, mode: trip.mode, mins: +mins.toFixed(1), saved: trip.mode !== 'walk' ? Math.max(0, +(walk - mins).toFixed(1)) : 0, line: trip.line || '', dest: trip.dest || '', dep: trip.dep || null}].slice(-80); save(); } }
   const p = cfg.places.find(q => q.id === trip.placeId);
   if (p) {
     let mins = (Date.now() - trip.start) / 60000 - (+p.platform || 0);
     if (trip.mode === 'lift') mins -= cfg.liftPickup;
     if (mins > 0.3 && mins < 120) { p.learned = p.learned || {}; const old = p.learned[trip.mode]; p.learned[trip.mode] = old == null ? mins : old * 0.7 + mins * 0.3; save(); }
   }
-  coachStop(); trip = null; drawTrip(); render();
+  coachStop(); trip = null; drawTrip(); render(); drawStory();
 }
 
 /* ---------- maps inside the Board (MapLibre loaded only when needed) ---------- */
@@ -715,7 +740,22 @@ async function suggest(q) {
   } catch (e) { $('#wSugg').innerHTML = ''; }
 }
 const jpTime = ms => { const d = new Date(ms); return {date: d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0'), time: String(d.getHours()).padStart(2, '0') + String(d.getMinutes()).padStart(2, '0')}; };
-async function planTo(dest) {
+function logHabit(d) {
+  cfg.habits = cfg.habits || []; let h = cfg.habits.find(x => x.name === d.name);
+  if (!h) { h = {name: d.name, lat: d.lat, lon: d.lon, t: []}; cfg.habits.push(h); }
+  h.t = [...h.t.filter(x => Date.now() - x < 60 * 864e5), Date.now()].slice(-40); cfg.habits = cfg.habits.slice(-20); save();
+}
+/* Google Now-style: a place you searched around this time on two or more earlier days (same kind of day) opens by itself */
+function habitNow() {
+  const n = new Date(), hr = n.getHours() + n.getMinutes() / 60, wk = n.getDay() % 6 !== 0; let top = null;
+  for (const h of cfg.habits || []) {
+    const days = new Set(h.t.filter(ts => { const d = new Date(ts), hh = d.getHours() + d.getMinutes() / 60; return Math.abs(hh - hr) <= 1 && (d.getDay() % 6 !== 0) === wk && d.toDateString() !== n.toDateString(); }).map(ts => new Date(ts).toDateString()));
+    if (days.size >= 2 && (!top || days.size > top.n)) top = {h, n: days.size};
+  }
+  return top;
+}
+async function planTo(dest, user = true) {
+  if (user) { logHabit(dest); WQ.auto = false; }
   WQ.to = dest; const o = origin();
   if (!o) { $('#wRes').innerHTML = '<div class="plan"><b>Where are you starting from?</b><p class="note">Tap "From here", or add your home in Setup.</p></div>'; return; }
   cfg.dests = [dest, ...(cfg.dests || []).filter(d => d.name !== dest.name)].slice(0, 6); save(); drawChips();
@@ -749,12 +789,12 @@ function drawPlan() {
   const legsBar = r => `<div class="legs">${r.legs.map(l => `<span style="flex:${Math.max(1, l.duration)};background:${legCol(l)}" title="${esc(l.instruction.summary)}"></span>`).join('')}</div>`;
   const opts = [...new Map(pick.map(p => [p.r, p])).values()].sort((a, b) => a.r.arr - b.r.arr);
   $('#wRes').innerHTML = `<div class="plan">
-    <h3>To ${esc(WQ.to.name)}</h3><p class="note" style="margin:0 0 6px">from ${esc(origin().name || 'here')} · leaving now</p>
+    ${WQ.auto ? '<p class="auto">You usually head here around now</p>' : ''}<h3>To ${esc(WQ.to.name)}</h3><p class="note" style="margin:0 0 6px">From ${esc(origin().name || 'here')}, leaving now</p>
     <p style="margin:6px 0 4px;font-size:18px">${headline}</p>
     <div class="rmap" id="rmap" role="img" aria-label="Map of the fastest route"></div><p class="mcred" style="padding:0">Map © OpenFreeMap, © OpenStreetMap contributors</p>
     ${opts.map(p => { const g = pick.filter(q => q.r === p.r); return `<div class="rr ${p.r === bestP.r ? 'best' : ''}"><span class="md">${g.map(q => `<span style="color:${q.m.col}" title="${q.m.label}">${svgI(q.m.k)}</span>`).join('')}</span><div class="rb"><i style="width:${Math.max(8, (p.r.arr - now) / span * 100)}%;background:${g[0].m.col}">${p.r.tl ? esc((p.r.tl.routeOptions?.[0]?.name || p.r.tl.mode.name) + ' ' + hhmm(p.r.dep)) : 'all the way'}</i></div><b>${hhmm(p.r.arr)}</b></div>`; }).join('')}
     ${opts.map(p => { const c = p.c, others = pick.filter(q => q.r === p.r).map(q => q.m.label).join(' / '); return `<div class="opt"><div class="row3"><span><b>${p.r.tl ? esc(p.r.tl.routeOptions?.[0]?.name || p.r.tl.mode.name) : 'Walk'}</b> ${p.r.tl ? 'from ' + esc(p.r.tl.departurePoint.commonName) + ' at ' + hhmm(p.r.dep) : ''}</span><span class="note">arrive ${hhmm(p.r.arr)}</span></div>
-      ${legsBar(p.r)}<div class="row3"><span class="g" style="font-weight:700" data-lv="${p.r.dep || p.r.start}" data-k="${p.m.k}" data-w="${p.r.w}">${others}: leave ${c.leave > 30 ? 'in ' + mmss(c.leave) : 'now'}</span><button class="go" data-o="${R.indexOf(p.r)}" data-m="${p.m.k}">Go</button></div></div>`; }).join('')}
+      ${legsBar(p.r)}<details class="steps"><summary>Whole trip, step by step</summary><ol>${p.r.legs.map(l => `<li><i style="background:${l.mode.id === 'walking' ? '#B8BCC6' : legCol(l)}"></i><span><b>${hhmm(new Date(l.departureTime).getTime())}</b> ${esc(l.instruction.summary)} <small class="note">${l.duration} min</small></span></li>`).join('')}<li><i style="background:var(--ink)"></i><span><b>${hhmm(p.r.arr)}</b> Arrive at ${esc(WQ.to.name)}</span></li></ol></details><div class="row3"><span class="g" style="font-weight:700" data-lv="${p.r.dep || p.r.start}" data-k="${p.m.k}" data-w="${p.r.w}">${others}: leave ${c.leave > 30 ? 'in ' + mmss(c.leave) : 'now'}</span><button class="go" data-o="${R.indexOf(p.r)}" data-m="${p.m.k}">Go</button></div></div>`; }).join('')}
     <p class="note" style="margin:10px 0 0">Journey data: TfL Journey Planner. Run, bike and lift timings are yours, learned on the Board.</p></div>`;
   routeMap(bestP.r);
   $('#wRes').querySelectorAll('.go').forEach(b => b.addEventListener('click', () => goJourney(R[+b.dataset.o], b.dataset.m)));
@@ -767,11 +807,12 @@ function goJourney(r, k) {
   startTrip(jpPlace, k, d);
 }
 setInterval(() => { if (!WQ.res) return; const now = Date.now(); document.querySelectorAll('[data-lv]').forEach(el => { const r = WQ.res.find(x => String(x.dep || x.start) === el.dataset.lv); if (!r) return; const c = catchable(r, el.dataset.k, now); el.textContent = el.textContent.replace(/leave .*$/, c.leave > 30 ? 'leave in ' + mmss(c.leave) : c.ok ? 'leave now' : 'too late'); }); }, 1000);
-setInterval(() => { if (WQ.to && document.visibilityState === 'visible') planTo(WQ.to); }, 120000);
+setInterval(() => { if (WQ.to && document.visibilityState === 'visible') planTo(WQ.to, false); }, 120000);
 $('#hi').textContent = greet();
 let wqT; $('#wq').addEventListener('input', e => { clearTimeout(wqT); wqT = setTimeout(() => suggest(e.target.value), 380); });
 $('#wMe').addEventListener('click', () => navigator.geolocation?.getCurrentPosition(g => { WQ.here = {lat: g.coords.latitude, lon: g.coords.longitude, name: 'here'}; $('#wMe').textContent = 'From here ✓'; if (WQ.to) planTo(WQ.to); }, () => { $('#wMe').textContent = 'No location'; }, {enableHighAccuracy: true, timeout: 10000}));
 drawChips();
+{ const hb = habitNow(); if (hb && origin()) { WQ.auto = true; $('#wq').value = hb.h.name; planTo(hb.h, false); } }
 
 /* ---------- live run coach: GPS pace vs the departure, spoken and buzzed ----------
    remaining route ≈ straight-line distance × 1.3 (typical street detour factor)
@@ -1081,6 +1122,17 @@ liftBtn.addEventListener('click', () => { cfg.liftOn = !cfg.liftOn; save(); sync
 syncLift();
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeDetail(); if ($('#setup').classList.contains('open')) closeSetup(); } });
 let poll = null;
+/* Moves-style storyline: the trips you made, how you got there and the minutes it saved you */
+function drawStory() {
+  const box = $('#story'), S = (cfg.story || []).filter(s => Date.now() - s.at < 7 * 864e5).sort((a, b) => b.at - a.at);
+  box.hidden = !S.length; if (!S.length) return;
+  const saved = S.reduce((a, s) => a + (s.saved || 0), 0), days = {};
+  S.forEach(s => { const k = new Date(s.at).toLocaleDateString('en-GB', {weekday: 'long', day: 'numeric', month: 'short'}); (days[k] = days[k] || []).push(s); });
+  const verb = {walk: 'Walked', run: 'Ran', bike: 'Cycled', lift: 'Got a lift'};
+  box.innerHTML = `<h2>Your trips</h2><p class="big2">${S.length} ${S.length === 1 ? 'trip' : 'trips'} this week${saved >= 1 ? `, ${Math.round(saved)} min saved by not just walking` : ''}</p>` +
+    Object.entries(days).map(([k, list]) => `<h3>${esc(k)}</h3><ol class="tl">${list.map(s => `<li><span class="tt">${hhmm(s.at - s.mins * 60000)}</span><span><b>${verb[s.mode] || 'Went'} to ${esc(s.place)}</b> in ${Math.round(s.mins)} min${s.line ? `, caught the ${s.dep ? hhmm(s.dep) + ' ' : ''}${esc(s.line)}` : ''}${s.saved >= 1 ? `<br><small class="g">${Math.round(s.saved)} min faster than walking</small>` : ''}</span></li>`).join('')}</ol>`).join('');
+}
+drawStory();
 drawMoney();
 const startPoll = () => { clearInterval(poll); poll = setInterval(() => { if (!document.hidden) refresh(); }, 25000); };
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });

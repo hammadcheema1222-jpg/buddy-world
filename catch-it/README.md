@@ -11,6 +11,7 @@
 | `station.html` Station | Entrance-to-platform time from OpenStreetMap indoor data: quickest, step-free or no-lift routes, crowd-adjusted walking speed, live TfL lift problems |
 
 ## Making the train
+- **Ideas borrowed from loved apps that shut down**: a Dark Sky-style one-line "next hour" summary and a 60-minute departure strip; Google Now-style trips that open by themselves when you usually make them (after 2+ days at the same time); a Moves-style "Your trips" storyline with minutes saved; Inbox-style trip bundles (every step in one card) and Snooze.
 - **Catch zone** (Board): a live isochrone around your station. Each ring is how far away you could be and still make the departure at that speed: r = v × (time left − platform walk − buffer − pick-up) ÷ 1.3. The rings shrink every second, everything outside them is greyed out, and it tells you which ring you're in.
 - **Route draw** (Where to?): the fastest journey draws itself leg by leg in official line colours, using MapLibre `line-progress` gradients.
 - **Where to?** (top of the Board): search any place, station or postcode. Map apps plan as if you walk to the first stop. Catch It also asks TfL's Journey Planner for journeys that started up to 15 minutes ago, then re-times your first walk at your own run, bike or lift speed. That shows the trains other apps hide, and how many minutes sooner you'd arrive, e.g. "Run and you're there 8 min sooner". Tap Go and the run coach takes over.
