@@ -199,7 +199,7 @@ details summary{cursor:pointer;font-weight:600;margin:10px 0}
 @media(prefers-reduced-motion:reduce){.busnow{transition:none}}
 </style>
 <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="ui.css?v=1795559467">
+<link rel="stylesheet" href="ui.css?v=1795560055">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -217,10 +217,11 @@ details summary{cursor:pointer;font-weight:600;margin:10px 0}
 <main class="wrap">
   <section class="where" id="where">
     <p class="hi" id="hi">Hello</p>
-    <h1>Where to?</h1>
-    <div class="sbox"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6950a1" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input id="wq" type="search" placeholder="Uni, a station, a postcode, anywhere" autocomplete="off" aria-label="Where to?"><button id="wMe" title="Start from where I am now">From here</button></div>
+    <h1>Will I be on time?</h1>
+    <p class="lede">Where do you need to be, and by when?</p>
+    <div class="sbox"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6950a1" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input id="wq" type="search" placeholder="Uni, work, a station, a postcode" autocomplete="off" aria-label="Where do you need to be?"><button id="wMe" title="Start from where I am now">From here</button></div>
     <div id="wSugg"></div>
-    <div class="when2" role="group" aria-label="When"><button data-w="now" aria-pressed="true">Leave now</button><button data-w="by" aria-pressed="false">Arrive by</button><input type="time" id="byT" aria-label="Arrive by time" hidden></div>
+    <div class="when2" role="group" aria-label="When"><button data-w="by" aria-pressed="true">Be there by</button><button data-w="now" aria-pressed="false">Just go now</button><input type="time" id="byT" aria-label="Arrive by time" hidden></div>
     <div class="wchips" id="wChips"></div>
     <div id="wRes"></div>
   </section>
@@ -437,7 +438,7 @@ async function radarTick() {
       const vp = (s.validityPeriods || []).map(v => [Date.parse(v.fromDate), Date.parse(v.toDate)]).filter(v => v[1] > Date.now()).sort((x, y) => x[0] - y[0])[0];
       items.push({line: l.name, id: l.id, sev: s.statusSeverityDescription, reason: s.reason.replace(/\s+/g, ' ').trim(), from: vp?.[0], to: vp?.[1], now: src === 'now' || (vp && vp[0] <= Date.now())});
     }
-    box.hidden = !items.length; if (!items.length) return;
+    window.__radar = items; box.hidden = !items.length; if (!items.length) return;
     const when = i => i.now ? 'now' : new Date(i.from).toLocaleDateString('en-GB', {weekday: 'long', day: 'numeric', month: 'short'}) + (i.to ? ' to ' + new Date(i.to).toLocaleDateString('en-GB', {weekday: 'short', day: 'numeric', month: 'short'}) : '');
     box.innerHTML = `<h3>Heads up</h3>` + items.slice(0, 4).map(i => `<details><summary><span class="pill" style="background:${LINE_COL[i.id] || '#3b3f5c'}">${esc(i.line)}</span> <b>${esc(i.sev)}</b> <span class="note">${esc(when(i))}</span></summary><p>${esc(i.reason)}</p></details>`).join('');
   } catch (e) { box.hidden = true; }
@@ -1015,7 +1016,52 @@ function catchable(r, k, now) {
 /* arrive by: for each way of getting to the first stop, the latest leave time that still gives an 80% chance:
    leave = first departure − your travel − buffer − 0.84·σ  (σ combines the departure's and your trip's spread) */
 function latestLeave(r, k) { if (!r.tl) return r.start; const T = modeTravel(k, r.w) * 60, sm = 0.12 * T + 20; return r.dep - (T + cfg.buffer + 0.8416 * Math.sqrt(3600 + sm * sm)) * 1000; }
-function drawArrive() {
+/* ---------- the on-time forecast ----------
+   P(on time | leave at L) = max over journeys j that arrive by the deadline of
+       Φ((first departure − L − your travel − buffer) / σ_catch)  ×  Φ((deadline − arrival) / σ_arrive)
+   σ_catch = √(60² + (0.12·T + 20)²)  (the departure's spread and your trip's spread)
+   σ_arrive = 120 s + 5% of the journey's length (later legs drift too). We take the best way of getting to the first stop. */
+function pJourney(r, L, k, by) {
+  let pc; if (!r.tl) pc = L <= r.start ? 1 : Math.max(0, 1 - (L - r.start) / 120000);
+  else { const T = modeTravel(k, r.w) * 60, sm = 0.12 * T + 20; pc = Phi(((r.dep - L) / 1000 - T - cfg.buffer) / Math.sqrt(3600 + sm * sm)); }
+  const sa = 120 + 0.05 * (r.arr - r.start) / 1000; return pc * Phi((by - r.arr) / 1000 / sa);
+}
+function pOnTime(L, by, ms) { let best = {p: 0, k: 'walk', r: null}; for (const m of ms) for (const r of WQ.res) { const p = pJourney(r, L, m.k, by); if (p > best.p + 1e-9 || (Math.abs(p - best.p) < 1e-9 && EFFORT[m.k] < EFFORT[best.k])) best = {p, k: m.k, r}; } return best; }
+function drawForecast() {
+  const now = Date.now(), by = WQ.by, ms = MODES.filter(m => m.k === 'walk' || (m.k === 'lift' ? cfg.liftOn : cfg.today?.[m.k] !== false));
+  if (!WQ.res?.length) return;
+  const cur = pOnTime(now, by, ms), walkOnly = pOnTime(now, by, ms.filter(m => m.k === 'walk')), pct = Math.round(cur.p * 100);
+  // leave-by ladder: the latest leave time that still gives each target chance (scan in 30 s steps)
+  const ladder = [0.95, 0.8, 0.5].map(target => { let L = null, k = null; for (let x = now; x <= by; x += 30000) { const b = pOnTime(x, by, ms); if (b.p >= target) { L = x; k = b.k; } } return {target, L, k}; });
+  // curve of chance against leave time
+  const end = Math.max(now + 10 * 60000, (ladder.find(l => l.L)?.L || now) + 12 * 60000), N = 60, pts = [];
+  for (let i = 0; i <= N; i++) { const x = now + (end - now) * i / N; pts.push([i / N * 300, 70 - pOnTime(x, by, ms).p * 62]); }
+  const path = 'M' + pts.map(q => q[0].toFixed(1) + ' ' + q[1].toFixed(1)).join(' L');
+  const verb = {walk: 'walk', run: 'run', bike: 'cycle', lift: 'get a lift'};
+  const tone = pct >= 85 ? 'g' : pct >= 50 ? 'a' : 'x';
+  // what's affecting it
+  const facts = [];
+  if (cur.k !== 'walk' && walkOnly.p < cur.p - 0.05) facts.push(`Walking alone gives ${Math.round(walkOnly.p * 100)}%. ${({run: 'Running', bike: 'Cycling', lift: 'The lift'})[cur.k]} is what makes the difference.`);
+  if (cur.r?.tl && wetBetween(now, (cur.r.dep || now))) facts.push('Rain on the way to the station: allow a little longer.');
+  const lineIds = (cur.r?.legs || []).map(l => l.routeOptions?.[0]?.lineIdentifier?.id).filter(Boolean);
+  (window.__radar || []).filter(i => lineIds.includes(i.id) && i.now).forEach(i => facts.push(`${i.line}: ${i.sev}.`));
+  const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], dow = new Date(by).getDay(), hm = hhmm(by);
+  $('#wRes').innerHTML = `<div class="plan fc">${WQ.tt ? `<p class="auto">${esc(WQ.tt)}</p>` : ''}
+    <div class="fbig ${tone}">${pct}<span>%</span></div>
+    <p class="fsub">chance you're at <b>${esc(WQ.to.name)}</b> by <b>${hm}</b> if you leave now${cur.k !== 'walk' ? ` and <b>${verb[cur.k]}</b>` : ''}.</p>
+    <svg class="fcurve" viewBox="0 0 300 78" preserveAspectRatio="none" aria-hidden="true"><path d="${path} L300 70 L0 70 Z" class="fa"/><path d="${path}" class="fl"/><line x1="0" x2="300" y1="70" y2="70" class="fb"/></svg>
+    <div class="fx"><span>now</span><span>leave later →</span><span>${hhmm(end)}</span></div>
+    <div class="ladder">${ladder.map(l => `<div><b>${Math.round(l.target * 100)}%</b><span>${l.L ? `leave by <b>${hhmm(l.L)}</b>${l.k !== 'walk' ? ' and ' + verb[l.k] : ''} <small class="note">${l.L - now > 60000 ? 'in ' + mmss((l.L - now) / 1000) : 'now'}</small>` : '<span class="note">not possible any more</span>'}</span></div>`).join('')}</div>
+    ${facts.length ? `<p class="facts">${facts.map(esc).join(' ')}</p>` : ''}
+    <details class="how"><summary>How? Show the route</summary>${cur.r ? `<p style="margin:6px 0">${cur.r.tl ? esc((cur.r.tl.routeOptions?.[0]?.name || cur.r.tl.mode.name) + ' from ' + cur.r.tl.departurePoint.commonName + ' at ' + hhmm(cur.r.dep)) : 'Walk all the way'}, arriving ${hhmm(cur.r.arr)}.</p><ol class="stepsl">${cur.r.legs.map(l => `<li><b>${hhmm(Date.parse(l.departureTime))}</b> ${esc(l.instruction.summary)} <small class="note">${l.duration} min</small></li>`).join('')}</ol>` : ''}
+      <button class="go" id="fGo" style="margin-top:8px">I'm leaving now</button></details>
+    <button class="go ghost" id="ttSave" style="margin-top:12px">Every ${DAYS[dow]} at ${hm}</button> <span class="note">makes this a weekly forecast</span></div>`;
+  $('#ttSave').addEventListener('click', e => { cfg.timetable = (cfg.timetable || []).filter(x => !(x.dow === dow && x.time === hm && x.name === WQ.to.name)).concat([{dow, time: hm, name: WQ.to.name, lat: WQ.to.lat, lon: WQ.to.lon}]); save(); e.target.textContent = 'Saved'; drawChips(); });
+  $('#fGo')?.addEventListener('click', () => cur.r && goJourney(cur.r, cur.k));
+}
+setInterval(() => { if (WQ.by && WQ.res && !document.querySelector('.how[open]')) drawForecast(); }, 15000);
+function drawArrive() { return drawForecast(); }
+function drawArriveOld() {
   const now = Date.now(), R = WQ.res.filter(r => r.arr <= WQ.by + 60000);
   if (!R.length) { $('#wRes').innerHTML = '<div class="plan"><b>No journey arrives by then.</b><p class="note">Try a later time.</p></div>'; return; }
   const ms = MODES.filter(m => m.k === 'walk' || (m.k === 'lift' ? cfg.liftOn : cfg.today?.[m.k] !== false));
@@ -1096,6 +1142,7 @@ async function lastHome() {
   $('#lastRem').addEventListener('click', async e => { try { if (Notification.permission === 'default') await Notification.requestPermission(); } catch (er) {} setTimeout(() => { try { new Notification('Last train home soon', {body: `Leave by ${hhmm(leave)} for the ${name}`}); } catch (er) {} try { navigator.vibrate?.([300, 120, 300]); } catch (er) {} }, Math.max(0, leave - 20 * 60000 - Date.now())); e.target.textContent = 'Reminder set (keep this page open)'; });
 }
 drawChips();
+{ const d = new Date(Date.now() + 60 * 60000); d.setMinutes(Math.ceil(d.getMinutes() / 5) * 5, 0, 0); setWhen(d.getTime()); }
 { const n = new Date(), soon = (cfg.timetable || []).map(x => ({x, at: nextOcc(x)})).filter(o => o.at - n < 5 * 3600e3).sort((a, b) => a.at - b.at)[0];
   if (soon && origin()) arriveBy(soon.x, soon.at, `Your ${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][soon.x.dow]} ${soon.x.time} at ${soon.x.name}`); }
 { const hb = habitNow(); if (hb && origin() && !WQ.to) { WQ.auto = true; $('#wq').value = hb.h.name; planTo(hb.h, false); } }

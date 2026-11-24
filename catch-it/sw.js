@@ -1,6 +1,6 @@
 /* Catch It offline helper: the app itself is cached (stale-while-revalidate);
    live data is network-first with the last good answer as a fallback, so it still opens underground. */
-const SHELL = 'catchit-shell-1795559467', DATA = 'catchit-data-v1';
+const SHELL = 'catchit-shell-1795560055', DATA = 'catchit-data-v1';
 const FILES = ['./', 'index.html', 'map.html', 'station.html', 'share.html', 'ui.css', 'mapstyle.js', 'world3d.js', 'data/stations.json', 'icon-192.png', 'manifest.webmanifest'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(SHELL).then(c => c.addAll(FILES)).catch(() => {})); self.skipWaiting(); });
 self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));

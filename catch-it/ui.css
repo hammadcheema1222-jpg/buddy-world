@@ -244,3 +244,20 @@ button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{ou
 .tcard small{color:var(--muted)}.tcard h3{margin:4px 0;font-size:22px;font-weight:600;letter-spacing:-.02em}.tcard p{margin:0 0 12px;color:var(--soft)}
 .tcard div{display:flex;gap:8px;justify-content:flex-end}.tcard button{padding:0 18px;background:var(--fill)}.tcard .main{background:var(--ink)!important;color:var(--bg)!important}
 @media (max-width:700px){#setBtn{margin-left:auto}}
+/* the on-time forecast */
+.where .lede{margin:-6px 2px 14px;color:var(--soft);font-size:17px}
+.fc{padding-top:18px}
+.fbig{font-weight:200;font-size:clamp(110px,34vw,170px);line-height:.85;letter-spacing:-.07em;margin:4px 0 6px}
+.fbig span{font-size:.4em;letter-spacing:0;margin-left:4px;color:var(--soft)}
+.fbig.g{color:var(--go)}.fbig.a{color:var(--risk)}.fbig.x{color:var(--stop)}
+.fsub{font-size:18px;margin:0 0 14px;line-height:1.35}
+.fcurve{width:100%;height:78px;display:block}
+.fcurve .fl{fill:none;stroke:var(--ink);stroke-width:1.5;vector-effect:non-scaling-stroke}
+.fcurve .fa{fill:var(--fill)}.fcurve .fb{stroke:var(--hair);vector-effect:non-scaling-stroke}
+.fx{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin:2px 0 14px}
+.ladder div{display:grid;grid-template-columns:56px 1fr;gap:10px;align-items:baseline;padding:10px 0;border-top:1px solid var(--hair)}
+.ladder div>b{font-weight:300;font-size:24px;letter-spacing:-.03em}
+.facts{color:var(--soft);font-size:15px;margin:12px 0 0}
+.how summary{cursor:pointer;font-weight:600;margin:16px 0 4px}
+.stepsl{margin:6px 0;padding-left:18px}.stepsl li{margin:4px 0}
+.go.ghost{background:var(--fill)!important;color:var(--ink)!important}
