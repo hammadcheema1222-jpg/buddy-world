@@ -199,7 +199,7 @@ details summary{cursor:pointer;font-weight:600;margin:10px 0}
 @media(prefers-reduced-motion:reduce){.busnow{transition:none}}
 </style>
 <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="ui.css?v=1795555547">
+<link rel="stylesheet" href="ui.css?v=1795556114">
 </head>
 <body class="tabs">
 <div class="top">
@@ -524,13 +524,14 @@ function heroDraw(now) {
     </div>
     <p class="raceTxt" id="raceTxt"></p>
     <div class="odds"><div class="bar"><i id="prBar" style="width:${Math.round(b.pr * 100)}%;background:${ok ? '#3dd39a' : '#e0a21f'}"></i></div><span><span id="heroPr">${Math.round(b.pr * 100)}</span>% chance${demo ? ' (demo)' : ''}</span></div>
-    <div class="acts"><button class="main" id="goBtn">I'm going</button><button id="remBtn">${remind ? 'Reminder set' : 'Remind me'}</button><button id="snzBtn" title="Hide this one and show the next">Snooze</button>${b.m.k === 'lift' || cfg.liftOn ? '<button id="liftAsk">Ask a friend for a lift</button>' : ''}${demo ? '<button id="exitDemo">Exit demo</button>' : ''}</div>
+    <div class="acts"><button class="main" id="goBtn">I'm going</button><button id="remBtn">${remind ? 'Reminder set' : 'Remind me'}</button><button id="snzBtn" title="Hide this one and show the next">Snooze</button>${b.m.k === 'lift' || cfg.liftOn ? '<button id="liftAsk">Ask a friend for a lift</button>' : ''}${demo ? '<button id="exitDemo">Exit demo</button>' : ''}<button id="missBtn">Missed it?</button></div>
     ${alts.length ? `<p class="lbl" style="color:inherit;opacity:.7;margin:16px 0 0">Plan B</p><div class="alts">${alts.map(o => `<button class="alt" data-k="${esc(o.x.key)}"><span><span class="pill" style="background:${o.x.colour};height:20px;font-size:11px;min-width:30px">${esc(shortLine(o.x))}</span> ${hhmm(o.x.t)}</span><small class="${o.v.cls}">${esc(o.v.txt.replace('✓ ', ''))}</small></button>`).join('')}</div>` : ''}`;
   h.dataset.key = d.key; h.dataset.m = b.m.k;
   $('#goBtn').addEventListener('click', () => startTrip(b.p, b.m.k, b.d));
   $('#liftAsk')?.addEventListener('click', () => askLift(b.p, b.d));
   $('#remBtn').addEventListener('click', () => setRemind(b));
   $('#snzBtn')?.addEventListener('click', () => snooze(b.d.key));
+  $('#missBtn')?.addEventListener('click', () => missedPlan(b.d));
   $('#exitDemo')?.addEventListener('click', exitDemo);
   h.querySelectorAll('.alt').forEach(a => a.addEventListener('click', () => { const x = deps.find(q => q.key === a.dataset.k); if (x) openDetail(x); }));
 }
@@ -823,7 +824,7 @@ const coach = {watch: null, pos: null, v: null, last: null, state: '', spokeAt: 
 const DETOUR = 1.3;
 const havM = (a, b) => { const R = 6371000, r = Math.PI / 180, dLa = (b[1] - a[1]) * r, dLo = (b[0] - a[0]) * r; const x = Math.sin(dLa / 2) ** 2 + Math.cos(a[1] * r) * Math.cos(b[1] * r) * Math.sin(dLo / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(x)); };
 function coachStart() {
-  coach.pos = coach.v = coach.last = null; coach.state = ''; coach.spokeAt = 0;
+  coach.pos = coach.v = coach.last = null; coach.state = ''; coach.spokeAt = 0; coach.missOpened = false;
   try { navigator.wakeLock?.request('screen').then(w => coach.wake = w).catch(() => {}); } catch (e) {}
   if (navigator.geolocation) coach.watch = navigator.geolocation.watchPosition(g => {
     const now = Date.now(), here = [g.coords.longitude, g.coords.latitude];
@@ -864,6 +865,7 @@ function coachTick(now) {
   const t = $('#tripT'); if (t) t.textContent = mmss(elapsed);
   if (st !== coach.state || (st === 'behind' && now - coach.spokeAt > 20000)) {
     if (coach.state || st !== 'ok') say(st === 'gone' ? 'Missed it. Check plan B.' : words, st === 'behind' ? [250, 120, 250, 120, 250] : st === 'tight' ? [180, 100, 180] : [90]);
+    if (st === 'gone' && !coach.missOpened) { coach.missOpened = true; setTimeout(() => missedPlan(d || null), 1500); }
     if (st === 'gone') { const alt = deps.find(x => x.key !== trip.key && verdict(x, placeOf(x.placeId), now).cls === 'g'); if (alt) $('#cSay').textContent = `Missed it. Next you can catch: ${hhmm(alt.t)} ${shortName(alt)}.`; }
     coach.state = st; coach.spokeAt = now;
   }
@@ -939,6 +941,32 @@ function openDetail(d) {
   $('#detail').classList.add('open');
   $('#dClose').addEventListener('click', closeDetail);
   if (d.mode === 'bus' && d.vehicleId) follow(d);
+}
+/* ---------- Missed it? A plan, not a dead end ----------
+   next catchable departures, how often this line really comes (mean gap between its departures),
+   and if the wait is long enough, a warm place to wait that you can reach and still get back in time */
+async function missedPlan(d) {
+  const now = Date.now(), sheet = $('#detailSheet'), p = d ? placeOf(d.placeId) : null;
+  const next = deps.filter(x => x !== d && !x.cancelled && x.t > now).map(x => ({x, v: verdict(x, placeOf(x.placeId), now)})).filter(o => o.v.cls === 'g' || o.v.cls === 'a').slice(0, 3);
+  const same = d ? deps.filter(x => x.placeId === d.placeId && x.lineId === d.lineId).map(x => x.t).sort((a, b) => a - b) : [];
+  const gaps = same.slice(1).map((t2, i) => (t2 - same[i]) / 60000).filter(g => g > 0.5 && g < 90), head = gaps.length ? gaps.reduce((a, b) => a + b, 0) / gaps.length : null;
+  const wait = next[0] ? (next[0].x.t - now) / 60000 : null, cold = wx.temp != null && wx.temp < 8, wet = wx.rain > 0.2;
+  sheet.innerHTML = `<button class="close" id="dClose">Close</button><h2>${d ? `Missed the ${hhmm(d.t)}?` : 'Missed it?'}</h2><p class="note" style="margin-top:0">Here's the plan.</p>
+    ${next.length ? `<h3>Next you can catch</h3>${next.map(o => `<div class="mrow"><span class="pill" style="background:${o.x.colour}">${esc(shortLine(o.x))}</span><b>${hhmm(o.x.t)}</b><span>${esc(o.x.dest)}</span><small class="${o.v.cls}">${esc(o.v.txt.replace('✓ ', ''))}</small></div>`).join('')}` : '<p>Nothing else you can catch in the next while from your stops.</p>'}
+    ${head ? `<p class="note">The ${esc(shortName(d))} comes about every ${Math.round(head)} min here${d.mode === 'bus' ? ', so on average you wait about ' + Math.round(head / 2) + ' min (half the gap)' : ''}.</p>` : ''}
+    ${wet || cold ? `<p>It's ${wx.temp != null ? Math.round(wx.temp) + '°C' : 'cold'}${wet ? ' and raining' : ''}, so wait inside if you can.</p>` : ''}
+    <div id="mCafe"></div>
+    ${WQ.to ? `<button class="cta" id="mRe" style="width:100%;margin-top:12px">Re-plan to ${esc(WQ.to.name)} from now</button>` : ''}`;
+  $('#detail').classList.add('open'); $('#dClose').addEventListener('click', closeDetail);
+  $('#mRe')?.addEventListener('click', () => { closeDetail(); planTo(WQ.to, false); $('#where').scrollIntoView({behavior: 'smooth'}); });
+  if (p?.lat && wait && wait >= 8) {
+    try {
+      const r = await getJSON(`https://photon.komoot.io/api/?q=cafe&osm_tag=amenity:cafe&limit=6&lat=${p.lat}&lon=${p.lon}`);
+      const v = 1.3, spare = wait - 4;                                        // walk there and back at 1.3 m/s, keep 4 min in hand
+      const c = (r.features || []).map(f => ({n: f.properties.name, d: havM([p.lon, p.lat], f.geometry.coordinates) * 1.3})).filter(c => c.n && 2 * c.d / v / 60 < spare).sort((a, b) => a.d - b.d)[0];
+      if (c && $('#mCafe')) { const walkMin = Math.max(1, Math.round(c.d / v / 60)); $('#mCafe').innerHTML = `<h3>Wait somewhere warm</h3><p><b>${esc(c.n)}</b> is about ${walkMin} min away. Leave it by <b>${hhmm(next[0].x.t - (walkMin + 4) * 60000)}</b> to make the ${hhmm(next[0].x.t)}.</p>`; }
+    } catch (e) {}
+  }
 }
 function closeDetail() { $('#detail').classList.remove('open'); clearInterval(followTimer); }
 $('#detail').addEventListener('click', e => { if (e.target.id === 'detail') closeDetail(); });

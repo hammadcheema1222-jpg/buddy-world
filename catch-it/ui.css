@@ -203,3 +203,5 @@ button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{ou
 .steps ol{list-style:none;margin:6px 0 8px;padding:0 0 0 12px;border-left:1px solid var(--hair)}
 .steps li{position:relative;display:flex;gap:8px;padding:5px 0;font-size:15px}
 .steps li i{position:absolute;left:-17px;top:10px;width:9px;height:9px;border-radius:50%}
+.mrow{display:grid;grid-template-columns:auto auto 1fr;gap:4px 10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--hair)}
+.mrow small{grid-column:1/-1;font-weight:600}

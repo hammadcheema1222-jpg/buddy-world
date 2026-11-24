@@ -52,9 +52,11 @@ input[type=range]{width:100%;accent-color:#6950a1}
 @media(max-width:800px){.layout{grid-template-columns:1fr}nav a{padding:8px}.logo span{display:none}}
 @media(prefers-reduced-motion:reduce){.flow{animation:none}}
 .carbox{display:flex;gap:3px;margin:8px 0}.carbox span{flex:1;height:30px;border-radius:6px;background:var(--panel);display:grid;place-items:center;font-size:12px;font-weight:800}.carbox span.hit{background:var(--go);color:#fff}
+.point{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:50;background:var(--bg,#fff);border-radius:28px;box-shadow:0 10px 40px rgba(22,24,29,.18);padding:18px 22px 16px;width:min(340px,calc(100% - 24px));text-align:center}
+.point svg{transition:transform .25s ease-out}.point .pd{font-size:40px;font-weight:300;letter-spacing:-.04em;margin:4px 0}.point .px{position:absolute;right:10px;top:8px;min-height:36px;width:36px;padding:0;font-size:22px}
 </style>
 <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="ui.css?v=1795555547">
+<link rel="stylesheet" href="ui.css?v=1795556114">
 </head>
 <body class="tabs">
 <div class="top"><a class="logo" href="./"><i></i><span>Catch It</span></a>
@@ -169,9 +171,10 @@ function solve() {
   if (!sel || !res.some(r => r.pl.id === sel)) sel = res.find(r => r.secs != null)?.pl.id;
   const chosen = res.find(r => r.pl.id === sel);
   const path = []; if (chosen?.node != null) { let n = chosen.node; while (n != null) { path.unshift(n); n = prev[n]; } }
-  draw(path, res);
+  draw(path, res); window.__lastPath = path;
   $('#answers').innerHTML = !G.platforms.length ? '<p>No platforms are mapped here in OpenStreetMap yet.</p>' : `
     ${chosen?.secs != null ? `<p class="note">${esc(chosen.pl.name)}</p><div class="big">${mmss(chosen.secs)}</div><p class="note">from ${esc(start.name)} at ${v.toFixed(2)} m/s walking speed${mode !== 'any' ? ', ' + $('#mode').selectedOptions[0].text.toLowerCase() : ''}</p><button id="useT">Use ${Math.ceil(chosen.secs / 60)} min as this station's entrance-to-platform time</button>` : '<p>No route found with these settings.</p>'}
+    ${chosen?.secs != null ? '<button id="pointBtn" class="main" style="width:100%;margin:12px 0 4px">Point me there</button>' : ''}
     ${carHtml(chosen, path)}
     <h3>Every platform</h3><table><tbody>${res.map(r => `<tr data-id="${r.pl.id}" class="${r.pl.id === sel ? 'sel' : ''}"><td>${esc(r.pl.name)}</td><td class="n">${r.secs == null ? 'no route' : mmss(r.secs)}</td></tr>`).join('')}</tbody></table>
     <p class="note">Stairs are walked at about 45% of flat speed plus a few seconds; each lift adds a 45 s wait. Crowding slows everyone (Weidmann).</p>`;
@@ -200,6 +203,35 @@ function carHtml(chosen, path) {
     <label class="note">Train length <select id="cars" style="width:auto;min-height:36px">${[4, 5, 6, 8, 9, 10, 12].map(n => `<option ${n === cars ? 'selected' : ''}>${n}</option>`).join('')}</select> carriages (Elizabeth line 9, Greater Anglia often 8 or 12)</label>`;
 }
 document.addEventListener('change', e => { if (e.target.id === 'cars') { try { localStorage.setItem('catchit.cars', e.target.value); } catch (er) {} solve(); } });
+/* ---------- compass arrow: phone heading + GPS, guided along the mapped route (not through walls) ----------
+   arrow angle = bearing(you → a point two steps ahead on the route) − compass heading.
+   Indoors GPS is weak: when accuracy is worse than 35 m we point along the route from its start instead. */
+let PT = {on: false, head: null, me: null, acc: null, path: null};
+const brg = (a, b) => { const y = Math.sin((b.lon - a.lon) * DEG) * Math.cos(b.lat * DEG), x = Math.cos(a.lat * DEG) * Math.sin(b.lat * DEG) - Math.sin(a.lat * DEG) * Math.cos(b.lat * DEG) * Math.cos((b.lon - a.lon) * DEG); return (Math.atan2(y, x) / DEG + 360) % 360; };
+function onOri(e) { const h = e.webkitCompassHeading != null ? e.webkitCompassHeading : e.absolute && e.alpha != null ? (360 - e.alpha) % 360 : null; if (h != null) { PT.head = h; drawPoint(); } }
+async function startPoint(path) {
+  PT.path = path; PT.on = true;
+  try { if (window.DeviceOrientationEvent?.requestPermission) { const r = await DeviceOrientationEvent.requestPermission(); if (r !== 'granted') throw 0; } } catch (e) { PT.noCompass = true; }
+  addEventListener('deviceorientationabsolute', onOri); addEventListener('deviceorientation', onOri);
+  PT.watch = navigator.geolocation?.watchPosition(g => { PT.me = {lat: g.coords.latitude, lon: g.coords.longitude}; PT.acc = g.coords.accuracy; drawPoint(); }, () => {}, {enableHighAccuracy: true, maximumAge: 1000});
+  let box = $('#point'); if (!box) { box = document.createElement('div'); box.id = 'point'; box.className = 'point'; document.body.appendChild(box); }
+  box.hidden = false; drawPoint();
+}
+function stopPoint() { PT.on = false; removeEventListener('deviceorientationabsolute', onOri); removeEventListener('deviceorientation', onOri); if (PT.watch != null) navigator.geolocation.clearWatch(PT.watch); const b = $('#point'); if (b) b.hidden = true; }
+function drawPoint() {
+  const box = $('#point'); if (!box || !PT.on || !PT.path?.length) return;
+  const N = G.nodes, P = PT.path.map(id => N[id]).filter(Boolean), good = PT.me && PT.acc != null && PT.acc <= 35;
+  let from = P[0], i = 0;
+  if (good) { let bd = Infinity; P.forEach((n, k) => { const d = hav(PT.me, n); if (d < bd) { bd = d; i = k; } }); from = PT.me; }
+  const to = P[Math.min(P.length - 1, i + 2)] || P.at(-1), left = P.slice(i).reduce((s, n, k, a) => k ? s + hav(a[k - 1], n) : s, good ? hav(PT.me, P[i]) : 0);
+  const b = brg(from, to), rot = PT.head == null ? b : (b - PT.head + 360) % 360, done = good && left < 8;
+  box.innerHTML = `<button class="px" id="ptClose" aria-label="Close">×</button>
+    <svg viewBox="0 0 100 100" width="150" height="150" style="transform:rotate(${rot}deg)" aria-hidden="true"><circle cx="50" cy="50" r="46" fill="none" stroke="var(--hair)" stroke-width="2"/><path d="M50 10 L68 62 L50 52 L32 62 Z" fill="var(--ink)"/></svg>
+    <p class="pd">${done ? "You're there" : Math.round(left) + ' m'}</p>
+    <p class="note" style="margin:0">${PT.head == null ? (PT.noCompass ? 'No compass on this device: hold the phone flat and the arrow shows the map direction.' : 'Turn on motion access to use the compass.') : good ? 'Follow the arrow along the route.' : 'GPS is weak indoors. Stand at the entrance and walk the way the arrow points, then follow the plan.'}</p>`;
+  $('#ptClose').onclick = stopPoint;
+}
+document.addEventListener('click', e => { if (e.target.id === 'pointBtn' && G) { const path = window.__lastPath || []; startPoint(path); } });
 let walker = null;
 function draw(path, res) {
   const N = G.nodes, ids = new Set(); G.edges.forEach(e => { ids.add(e.a); ids.add(e.b); }); G.allPlatforms.forEach(pl => pl.nodes.forEach(n => ids.add(n)));
