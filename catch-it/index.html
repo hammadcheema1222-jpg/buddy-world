@@ -199,7 +199,11 @@ details summary{cursor:pointer;font-weight:600;margin:10px 0}
 @media(prefers-reduced-motion:reduce){.busnow{transition:none}}
 </style>
 <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="ui.css?v=1795557334">
+<link rel="stylesheet" href="ui.css?v=1795558196">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Catch It">
 </head>
 <body class="tabs">
 <div class="top">
@@ -216,9 +220,11 @@ details summary{cursor:pointer;font-weight:600;margin:10px 0}
     <h1>Where to?</h1>
     <div class="sbox"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6950a1" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input id="wq" type="search" placeholder="Uni, a station, a postcode, anywhere" autocomplete="off" aria-label="Where to?"><button id="wMe" title="Start from where I am now">From here</button></div>
     <div id="wSugg"></div>
+    <div class="when2" role="group" aria-label="When"><button data-w="now" aria-pressed="true">Leave now</button><button data-w="by" aria-pressed="false">Arrive by</button><input type="time" id="byT" aria-label="Arrive by time" hidden></div>
     <div class="wchips" id="wChips"></div>
     <div id="wRes"></div>
   </section>
+  <section class="radar" id="radar" hidden></section>
   <p class="sum" id="sum"></p>
   <div class="strip" id="strip" aria-hidden="true"></div>
   <section id="hero" class="call calm" aria-live="polite"></section>
@@ -234,6 +240,7 @@ details summary{cursor:pointer;font-weight:600;margin:10px 0}
   <p class="note" id="foot"></p>
 </main>
 
+<button id="installBtn" class="install" hidden>Install Catch It</button>
 <div class="drawer" id="detail"><div class="sheet" id="detailSheet"></div></div>
 <div class="drawer" id="setup"><div class="sheet" id="setupSheet"></div></div>
 
@@ -275,6 +282,7 @@ function modeSecs(p, m) {
   else mins = cfg.liftPickup + (L.lift ?? W * F.drive);
   if (m !== 'lift') mins *= phys(p, m, mins).f;
   const wet = (m !== 'lift' && wx.rain > 0.2) ? 1.08 : 1;
+  mins += crowdExtra(p);
   return (mins * wet + (+p.platform || 0)) * 60;
 }
 function modeSigma(p, m, T) { return 0.12 * T + 20 + (m === 'lift' ? cfg.liftPickup * 15 : 0); }
@@ -385,13 +393,15 @@ async function refresh() {
   const win = cfg.window * 60e3;
   deps = out.filter(d => d.raw > now - 60e3 && d.raw < now + win).map(d => { d.t = kalman(d.key, d.raw, d.sigma); return d; }).sort((a, b) => a.t - b.t).slice(0, 14);
   lastErr = errs.join(', '); if (out.length || !errs.length) lastOk = Date.now();
-  render();
+  if (deps.length) { try { localStorage.setItem('catchit.last', JSON.stringify({at: now, deps: deps.map(d => Object.assign({}, d, {calls: undefined}))})); } catch (e) {} }
+  else if (errs.length) { try { const c = JSON.parse(localStorage.getItem('catchit.last') || 'null'); if (c && now - c.at < 45 * 60e3) { deps = c.deps.filter(d => d.t > now - 60e3); lastErr = 'Offline: showing departures saved at ' + hhmm(c.at); } } catch (e) {} }
+  render(); radarTick.ran || (radarTick.ran = 1, radarTick());
 }
 async function weather() {
   const p = cfg.places.find(q => q.lat); if (!p || demo) return;
   try {
-    const w = await getJSON('https://api.open-meteo.com/v1/forecast?latitude=' + p.lat + '&longitude=' + p.lon + '&current=precipitation,temperature_2m,wind_speed_10m,wind_direction_10m');
-    wx = {rain: w.current.precipitation, temp: w.current.temperature_2m, wind: w.current.wind_speed_10m, wdir: w.current.wind_direction_10m};
+    const w = await getJSON('https://api.open-meteo.com/v1/forecast?latitude=' + p.lat + '&longitude=' + p.lon + '&current=precipitation,temperature_2m,wind_speed_10m,wind_direction_10m&minutely_15=precipitation&forecast_minutely_15=10&timezone=GMT');
+    wx = {rain: w.current.precipitation, temp: w.current.temperature_2m, wind: w.current.wind_speed_10m, wdir: w.current.wind_direction_10m, m15: (w.minutely_15?.time || []).map((s, i) => ({t: Date.parse(s + 'Z'), mm: w.minutely_15.precipitation[i] || 0}))};
   } catch (e) {}
   // height of each stop above home (Open-Meteo elevation, 90 m DEM) for the hill model
   const need = cfg.home ? cfg.places.filter(q => q.lat && q.dz == null) : [];
@@ -401,6 +411,37 @@ async function weather() {
     need.forEach((q, i) => { q.dz = +(r.elevation[i + 1] - r.elevation[0]).toFixed(1); }); save();
   } catch (e) {}
 }
+
+/* ---------- how busy: TfL live crowding as a share of the usual level at this time ----------
+   busier than usual slows the walk to the platform: extra = min(3, (share − 1) × 2.5) minutes */
+const crowd = {};
+async function crowdTick() {
+  for (const p of cfg.places) { const id = p.tflId || ''; if (!/^9[14]0G/.test(id)) continue;
+    try { const r = await getJSON(`${TFL}/crowding/${encodeURIComponent(id)}/Live`); crowd[p.id] = r.dataAvailable ? r.percentageOfBaseline : null; } catch (e) { crowd[p.id] = null; } }
+}
+function crowdExtra(p) { const c = crowd[p.id]; return c && c > 1.15 ? Math.min(3, (c - 1) * 2.5) : 0; }
+function crowdTxt(p) { const c = crowd[p.id]; if (c == null) return ''; return c > 1.15 ? `${esc(p.name)} is busier than usual (${Math.round(c * 100)}% of normal), so allow ${Math.round(crowdExtra(p) * 60)} s more` : c < 0.6 ? `${esc(p.name)} is quieter than usual` : ''; }
+crowdTick(); setInterval(crowdTick, 300000);
+
+/* ---------- disruption radar: live and planned problems on your TfL lines for the next 7 days ---------- */
+async function radarTick() {
+  const ids = [...new Set(deps.filter(d => d.src === 'TfL').map(d => d.lineId).concat(cfg.places.some(p => /^910G/.test(p.tflId || '')) ? ['elizabeth'] : []))].slice(0, 12);
+  const box = $('#radar'); if (!ids.length || demo) { box.hidden = true; return; }
+  const day = d => d.toISOString().slice(0, 10), a = new Date(), z = new Date(Date.now() + 7 * 864e5);
+  try {
+    const [live, plan] = await Promise.all([getJSON(`${TFL}/Line/${ids.join(',')}/Status`), getJSON(`${TFL}/Line/${ids.join(',')}/Status/${day(a)}/to/${day(z)}`).catch(() => [])]);
+    const items = [], seen = new Set();
+    for (const [src, list] of [['now', live], ['soon', plan]]) for (const l of list || []) for (const s of l.lineStatuses || []) {
+      if (s.statusSeverity === 10 || !s.reason) continue; const key = l.id + s.reason.slice(0, 80); if (seen.has(key)) continue; seen.add(key);
+      const vp = (s.validityPeriods || []).map(v => [Date.parse(v.fromDate), Date.parse(v.toDate)]).filter(v => v[1] > Date.now()).sort((x, y) => x[0] - y[0])[0];
+      items.push({line: l.name, id: l.id, sev: s.statusSeverityDescription, reason: s.reason.replace(/\s+/g, ' ').trim(), from: vp?.[0], to: vp?.[1], now: src === 'now' || (vp && vp[0] <= Date.now())});
+    }
+    box.hidden = !items.length; if (!items.length) return;
+    const when = i => i.now ? 'now' : new Date(i.from).toLocaleDateString('en-GB', {weekday: 'long', day: 'numeric', month: 'short'}) + (i.to ? ' to ' + new Date(i.to).toLocaleDateString('en-GB', {weekday: 'short', day: 'numeric', month: 'short'}) : '');
+    box.innerHTML = `<h3>Heads up</h3>` + items.slice(0, 4).map(i => `<details><summary><span class="pill" style="background:${LINE_COL[i.id] || '#3b3f5c'}">${esc(i.line)}</span> <b>${esc(i.sev)}</b> <span class="note">${esc(when(i))}</span></summary><p>${esc(i.reason)}</p></details>`).join('');
+  } catch (e) { box.hidden = true; }
+}
+setTimeout(radarTick, 4000); setInterval(radarTick, 600000);
 
 /* ---------- physics of getting there ----------
    wind: hold your effort (power) fixed and solve  c·v + ½ρ·CdA·(v + w)²·v = P0  for v, where w is the headwind
@@ -467,12 +508,24 @@ function snooze(k) { snoozed.add(k); try { sessionStorage.setItem('catchit.snooz
 /* Dark Sky-style: one plain sentence for the next hour, and a 60-minute strip where each departure is a mark */
 const verbOf = k => ({run: 'run', bike: 'cycle', lift: 'get a lift', walk: 'walk'})[k];
 function nextHour(now) { return deps.filter(d => !d.cancelled && d.t > now && d.t - now < 3600e3).map(d => { const p = placeOf(d.placeId); return {d, v: p ? verdict(d, p, now) : {cls: 'n'}}; }); }
+/* rain window: is there rain (≥ 0.1 mm per 15 min) while you'd be walking? if so, is there a later train you can catch with a dry walk? */
+function wetBetween(a, b) { return (wx.m15 || []).some(s => s.t < b && s.t + 900e3 > a && s.mm >= 0.1); }
+function rainNote(b, now) {
+  if (!wx.m15?.length || b.m.k === 'lift') return '';
+  const go = now + Math.max(0, b.li) * 1000, walk = modeSecs(b.p, b.m.k) * 1000;
+  if (wetBetween(go, go + walk)) {
+    const dry = deps.filter(x => x.t > b.d.t && x.placeId === b.d.placeId && !x.cancelled).find(x => { const p = placeOf(x.placeId), l = leaveIn(x, p, b.m.k, now); return l > 0 && !wetBetween(now + l * 1000, now + l * 1000 + walk); });
+    return dry ? `Rain on your walk. The ${hhmm(dry.t)} ${shortName(dry)} lets you walk once it's dry.` : 'Rain on your walk, and it lasts a while: take a coat.';
+  }
+  const next = (wx.m15 || []).find(s => s.t > go + walk && s.mm >= 0.1 && s.t - now < 90 * 60e3);
+  return next ? `Dry for your walk. Rain from about ${hhmm(next.t)}, so leaving on time keeps you dry.` : '';
+}
 function drawSummary(now) {
   const el = $('#sum'), st = $('#strip'); if (!el) return;
   if (!deps.length) { el.textContent = ''; st.innerHTML = ''; st.hidden = true; return; }
   const L = nextHour(now), ok = L.filter(x => x.v.cls === 'g' || x.v.cls === 'a'), b = best(now);
   el.innerHTML = ok.length && b ? `<b>Next hour:</b> ${ok.length} ${ok.length === 1 ? 'departure' : 'departures'} you can still catch. The best is the ${hhmm(b.d.t)} ${esc(shortName(b.d))}${b.m.k !== 'walk' ? ' if you ' + verbOf(b.m.k) : ''}.` : '<b>Next hour:</b> nothing you can still catch from here. Try Where to? for another way.';
-  if (b) { const pn = physNote(b.p, b.m.k); if (pn) el.innerHTML += `<br><span class="phys">${esc(pn)}</span>`; }
+  if (b) { const pn = physNote(b.p, b.m.k); if (pn) el.innerHTML += `<br><span class="phys">${esc(pn)}</span>`; const rn = rainNote(b, now); if (rn) el.innerHTML += `<br><span class="phys rain">${esc(rn)}</span>`; }
   st.hidden = false;
   if (!st.dataset.built) { st.dataset.built = '1'; st.innerHTML = '<i class="sl"></i>' + [0, 5, 10, 20, 60].map(m => `<span class="sx" style="left:${fisheye(m / 60) * 100}%">${m ? m + ' min' : 'now'}</span>`).join('') + '<div class="sm" id="sm"></div>'; }
   const sm = $('#sm'), have = new Set();
@@ -628,7 +681,8 @@ function heroDraw(now) {
   const ok = b.pr >= cfg.want, d = b.d;
   h.className = 'call' + (ok ? '' : ' calm');
   const alts = deps.filter(x => x !== d && !x.cancelled).map(x => ({x, v: verdict(x, placeOf(x.placeId), now)})).filter(o => o.v.cls === 'g' || o.v.cls === 'a').slice(0, 4);
-  h.innerHTML = `<div class="top2"><span class="pill" style="background:${d.colour}">${esc(shortLine(d))}</span><span>${hhmm(d.t)} to ${esc(d.dest)}</span><span style="opacity:.75">${esc(d.platform || '')}${d.platform ? ', ' : ''}${esc(b.p.name)}</span></div>
+  const ct = crowdTxt(b.p);
+  h.innerHTML = `${ct ? `<p class="crowd">${ct}</p>` : ''}<div class="top2"><span class="pill" style="background:${d.colour}">${esc(shortLine(d))}</span><span>${hhmm(d.t)} to ${esc(d.dest)}</span><span style="opacity:.75">${esc(d.platform || '')}${d.platform ? ', ' : ''}${esc(b.p.name)}</span></div>
     <div class="big"><span class="verb" style="color:${ok ? '#fff' : b.m.col}">${svgI(b.m.k).replace('<svg', '<svg style="width:18px;height:18px;vertical-align:-3px;margin-right:4px"')}${esc(b.m.label)}</span><span class="l" id="leaveLbl">leave in</span></div>
     <div class="big" style="margin-top:0"><b id="leaveTxt">--</b></div>
     <div class="race" aria-hidden="true">
@@ -637,7 +691,7 @@ function heroDraw(now) {
     </div>
     <p class="raceTxt" id="raceTxt"></p>
     <div class="odds"><div class="bar"><i id="prBar" style="width:${Math.round(b.pr * 100)}%;background:${ok ? '#3dd39a' : '#e0a21f'}"></i></div><span><span id="heroPr">${Math.round(b.pr * 100)}</span>% chance${demo ? ' (demo)' : ''}</span></div>
-    <div class="acts"><button class="main" id="goBtn">I'm going</button><button id="remBtn">${remind ? 'Reminder set' : 'Remind me'}</button><button id="snzBtn" title="Hide this one and show the next">Snooze</button>${b.m.k === 'lift' || cfg.liftOn ? '<button id="liftAsk">Ask a friend for a lift</button>' : ''}${demo ? '<button id="exitDemo">Exit demo</button>' : ''}<button id="missBtn">Missed it?</button></div>
+    <div class="acts"><button class="main" id="goBtn">I'm going</button><button id="remBtn">${remind ? 'Reminder set' : 'Remind me'}</button><button id="snzBtn" title="Hide this one and show the next">Snooze</button>${b.m.k === 'lift' || cfg.liftOn ? '<button id="liftAsk">Ask a friend for a lift</button>' : ''}${demo ? '<button id="exitDemo">Exit demo</button>' : ''}<button id="missBtn">Missed it?</button><button id="shareBtn">Share my ETA</button></div>
     ${alts.length ? `<p class="lbl" style="color:inherit;opacity:.7;margin:16px 0 0">Plan B</p><div class="alts">${alts.map(o => `<button class="alt" data-k="${esc(o.x.key)}"><span><span class="pill" style="background:${o.x.colour};height:20px;font-size:11px;min-width:30px">${esc(shortLine(o.x))}</span> ${hhmm(o.x.t)}</span><small class="${o.v.cls}">${esc(o.v.txt.replace('✓ ', ''))}</small></button>`).join('')}</div>` : ''}`;
   h.dataset.key = d.key; h.dataset.m = b.m.k;
   $('#goBtn').addEventListener('click', () => startTrip(b.p, b.m.k, b.d));
@@ -645,6 +699,7 @@ function heroDraw(now) {
   $('#remBtn').addEventListener('click', () => setRemind(b));
   $('#snzBtn')?.addEventListener('click', () => snooze(b.d.key));
   $('#missBtn')?.addEventListener('click', () => missedPlan(b.d));
+  $('#shareBtn')?.addEventListener('click', () => shareEta(b.d, b.p));
   $('#exitDemo')?.addEventListener('click', exitDemo);
   h.querySelectorAll('.alt').forEach(a => a.addEventListener('click', () => { const x = deps.find(q => q.key === a.dataset.k); if (x) openDetail(x); }));
 }
@@ -892,8 +947,11 @@ const legCol = l => LINE_COL[l.routeOptions?.[0]?.lineIdentifier?.id] || LEGCOL[
 function origin() { return WQ.here || (cfg.home ? {lat: cfg.home[1], lon: cfg.home[0], name: 'home'} : null); }
 function drawChips() {
   const ds = cfg.dests || [];
-  $('#wChips').innerHTML = ds.map((d, i) => `<button data-d="${i}">★ ${esc(d.name)}</button>`).join('');
-  $('#wChips').querySelectorAll('button').forEach(b => b.addEventListener('click', () => planTo(ds[+b.dataset.d])));
+  const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], tt = cfg.timetable || [];
+  $('#wChips').innerHTML = (cfg.home ? '<button id="lastBtn">Last train home</button>' : '') + tt.map((x, i) => `<button data-tt="${i}">${DAYS[x.dow]} ${x.time}, ${esc(x.name)}</button>`).join('') + ds.map((d, i) => `<button data-d="${i}">★ ${esc(d.name)}</button>`).join('');
+  $('#lastBtn')?.addEventListener('click', lastHome);
+  $('#wChips').querySelectorAll('[data-tt]').forEach(b => b.addEventListener('click', () => { const x = tt[+b.dataset.tt]; arriveBy(x, nextOcc(x)); }));
+  $('#wChips').querySelectorAll('[data-d]').forEach(b => b.addEventListener('click', () => { setWhen(null); planTo(ds[+b.dataset.d]); }));
 }
 async function suggest(q) {
   q = q.trim(); if (q.length < 3) { $('#wSugg').innerHTML = ''; return; }
@@ -928,8 +986,10 @@ async function planTo(dest, user = true) {
   if (!o) { $('#wRes').innerHTML = '<div class="plan"><b>Where are you starting from?</b><p class="note">Tap "From here", or add your home in Setup.</p></div>'; return; }
   cfg.dests = [dest, ...(cfg.dests || []).filter(d => d.name !== dest.name)].slice(0, 6); save(); drawChips();
   $('#wRes').innerHTML = '<div class="plan"><p class="note" style="margin:0">Finding every train and bus you could still catch…</p></div>';
-  const now = Date.now(), qs = [now - 15 * 60000, now + 6 * 60000].map(ms => { const j = jpTime(ms); return getJSON(`${TFL}/Journey/JourneyResults/${o.lat.toFixed(5)},${o.lon.toFixed(5)}/to/${dest.lat.toFixed(5)},${dest.lon.toFixed(5)}?date=${j.date}&time=${j.time}&timeIs=Departing&journeyPreference=leasttime`).catch(() => null); });
+  const now = Date.now(), JP = (ms, kind) => { const j = jpTime(ms); return getJSON(`${TFL}/Journey/JourneyResults/${o.lat.toFixed(5)},${o.lon.toFixed(5)}/to/${dest.lat.toFixed(5)},${dest.lon.toFixed(5)}?date=${j.date}&time=${j.time}&timeIs=${kind}&journeyPreference=leasttime`).catch(() => null); };
+  const qs = WQ.by ? [JP(WQ.by, 'Arriving'), JP(WQ.by - 20 * 60000, 'Arriving')] : [JP(now - 15 * 60000, 'Departing'), JP(now + 6 * 60000, 'Departing')];
   const out = (await Promise.all(qs)).filter(Boolean), seen = new Set(), js = [];
+  if (WQ.to !== dest) return;   // a newer search replaced this one
   for (const r of out) for (const j of r.journeys || []) { const k = j.legs.map(l => l.departureTime + l.mode.id).join('|'); if (!seen.has(k)) { seen.add(k); js.push(j); } }
   if (!js.length) { $('#wRes').innerHTML = `<div class="plan"><b>No journeys found</b><p class="note">TfL's planner covers London and the South East. Try a nearer place or a station name.</p></div>`; return; }
   WQ.res = js.map(j => {
@@ -945,8 +1005,25 @@ function catchable(r, k, now) {
   const T = modeTravel(k, r.w) * 60, sm = 0.12 * T + 20, sl = (r.dep - now) / 1000 - T - cfg.buffer;
   return {ok: Phi(sl / Math.sqrt(60 * 60 + sm * sm)) >= cfg.want, pr: Phi(sl / Math.sqrt(3600 + sm * sm)), leave: sl - 0.8416 * Math.sqrt(3600 + sm * sm)};
 }
+/* arrive by: for each way of getting to the first stop, the latest leave time that still gives an 80% chance:
+   leave = first departure − your travel − buffer − 0.84·σ  (σ combines the departure's and your trip's spread) */
+function latestLeave(r, k) { if (!r.tl) return r.start; const T = modeTravel(k, r.w) * 60, sm = 0.12 * T + 20; return r.dep - (T + cfg.buffer + 0.8416 * Math.sqrt(3600 + sm * sm)) * 1000; }
+function drawArrive() {
+  const now = Date.now(), R = WQ.res.filter(r => r.arr <= WQ.by + 60000);
+  if (!R.length) { $('#wRes').innerHTML = '<div class="plan"><b>No journey arrives by then.</b><p class="note">Try a later time.</p></div>'; return; }
+  const ms = MODES.filter(m => m.k === 'walk' || (m.k === 'lift' ? cfg.liftOn : cfg.today?.[m.k] !== false));
+  const rows = ms.map(m => { const best = R.map(r => ({r, at: latestLeave(r, m.k)})).sort((a, b) => b.at - a.at)[0]; return {m, ...best}; });
+  const w = rows.find(x => x.m.k === 'walk'), top = rows.reduce((a, b) => b.at > a.at ? b : a), extra = w ? Math.round((top.at - w.at) / 60000) : 0;
+  const dow = new Date(WQ.by).getDay(), hm = hhmm(WQ.by), DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  $('#wRes').innerHTML = `<div class="plan">${WQ.tt ? `<p class="auto">${esc(WQ.tt)}</p>` : ''}<h3>Be at ${esc(WQ.to.name)} by ${hm}</h3>
+    <p style="margin:6px 0 4px;font-size:18px">${extra >= 2 ? `${top.m.label} and you can leave <b>${extra} min later</b>` : `Leave by <b>${hhmm(top.at)}</b>`}</p>
+    ${rows.sort((a, b) => b.at - a.at).map(x => `<div class="opt"><div class="row3"><span><b style="color:${x.m.col}">${x.m.label}</b>: leave by <b>${hhmm(x.at)}</b>${x.at < now ? ' <span class="x">(already passed)</span>' : ` <span class="note">(in ${mmss((x.at - now) / 1000)})</span>`}</span><span class="note">arrive ${hhmm(x.r.arr)}</span></div><p class="note" style="margin:2px 0 0">${x.r.tl ? esc((x.r.tl.routeOptions?.[0]?.name || x.r.tl.mode.name) + ' from ' + x.r.tl.departurePoint.commonName + ' at ' + hhmm(x.r.dep)) : 'Walk all the way'}</p></div>`).join('')}
+    <button class="go" id="ttSave" style="margin-top:12px">Every ${DAYS[dow]} at ${hm}</button> <span class="note">saves this as a weekly trip</span></div>`;
+  $('#ttSave').addEventListener('click', e => { cfg.timetable = (cfg.timetable || []).filter(x => !(x.dow === dow && x.time === hm && x.name === WQ.to.name)).concat([{dow, time: hm, name: WQ.to.name, lat: WQ.to.lat, lon: WQ.to.lon}]); save(); e.target.textContent = 'Saved'; drawChips(); });
+}
 function drawPlan() {
   const now = Date.now(), R = WQ.res; if (!R) return;
+  if (WQ.by) return drawArrive();
   const ms = MODES.filter(m => m.k === 'walk' || (m.k === 'lift' ? cfg.liftOn : cfg.today?.[m.k] !== false));
   const pick = ms.map(m => { const r = R.find(x => catchable(x, m.k, now).ok); return r ? {m, r, c: catchable(r, m.k, now)} : null; }).filter(Boolean);
   if (!pick.length) { $('#wRes').innerHTML = '<div class="plan"><b>Nothing catchable right now</b></div>'; return; }
@@ -979,8 +1056,42 @@ setInterval(() => { if (WQ.to && document.visibilityState === 'visible') planTo(
 $('#hi').textContent = greet();
 let wqT; $('#wq').addEventListener('input', e => { clearTimeout(wqT); wqT = setTimeout(() => suggest(e.target.value), 380); });
 $('#wMe').addEventListener('click', () => navigator.geolocation?.getCurrentPosition(g => { WQ.here = {lat: g.coords.latitude, lon: g.coords.longitude, name: 'here'}; $('#wMe').textContent = 'From here ✓'; if (WQ.to) planTo(WQ.to); }, () => { $('#wMe').textContent = 'No location'; }, {enableHighAccuracy: true, timeout: 10000}));
+function nextOcc(x) { const n = new Date(), [h, m] = x.time.split(':').map(Number); const d = new Date(n); d.setHours(h, m, 0, 0); let add = (x.dow - n.getDay() + 7) % 7; if (add === 0 && d < n) add = 7; d.setDate(d.getDate() + add); return d.getTime(); }
+function setWhen(by) { WQ.by = by; document.querySelectorAll('.when2 button').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.w === 'by') === !!by))); $('#byT').hidden = !by; if (by) $('#byT').value = hhmm(by); }
+function arriveBy(dest, by, label) { setWhen(by); WQ.tt = label || ''; $('#wq').value = dest.name; planTo(dest, false); }
+document.querySelectorAll('.when2 button').forEach(b => b.addEventListener('click', () => { if (b.dataset.w === 'now') { setWhen(null); WQ.tt = ''; } else { const d = new Date(Date.now() + 60 * 60000); d.setMinutes(Math.ceil(d.getMinutes() / 5) * 5, 0, 0); setWhen(d.getTime()); } if (WQ.to) planTo(WQ.to, false); }));
+$('#byT').addEventListener('change', e => { const [h, m] = e.target.value.split(':').map(Number); const d = new Date(); d.setHours(h, m, 0, 0); if (d < new Date()) d.setDate(d.getDate() + 1); WQ.by = d.getTime(); if (WQ.to) planTo(WQ.to, false); });
+
+/* ---------- last train home: the latest departure whose journey is still "normal" ----------
+   binary search on departure time (15-min precision, ≤ 6 h ahead): a time is good if TfL offers a journey starting within
+   30 min that takes ≤ max(1.6 × today's quickest, quickest + 25 min). After that you're on slow night routes. */
+async function lastHome() {
+  const o = WQ.here; if (!o) { $('#wRes').innerHTML = '<div class="plan"><b>Tap "From here" first</b><p class="note">Last train home needs to know where you are now.</p></div>'; return; }
+  const H = {lat: cfg.home[1], lon: cfg.home[0]}; WQ.to = null; WQ.res = null;
+  $('#wRes').innerHTML = '<div class="plan"><p class="note" style="margin:0">Searching tonight\'s timetable for your last good way home…</p></div>';
+  const RAIL = /elizabeth|national-rail|tube|overground|dlr|tram/, rail = x => x.legs.some(l => RAIL.test(l.mode.id));
+  const q = async ms => { const j = jpTime(ms); try { const r = await getJSON(`${TFL}/Journey/JourneyResults/${o.lat.toFixed(5)},${o.lon.toFixed(5)}/to/${H.lat.toFixed(5)},${H.lon.toFixed(5)}?date=${j.date}&time=${j.time}&timeIs=Departing&journeyPreference=leasttime`); return (r.journeys || []).map(x => ({x, start: Date.parse(x.startDateTime), arr: Date.parse(x.arrivalDateTime), dur: x.duration, rail: rail(x)})); } catch (e) { return []; } };
+  const now = Date.now(), base = await q(now); if (!base.length) { $('#wRes').innerHTML = '<div class="plan"><b>No journeys found from here.</b></div>'; return; }
+  // a 'good' way home uses a train if today's quickest does, and isn't much slower than the quickest
+  const quick = Math.min(...base.map(b => b.dur)), needRail = base.some(b => b.rail), lim = Math.max(1.35 * quick, quick + 20), ok = b => b.dur <= lim && (!needRail || b.rail);
+  const goodAt = async ms => (await q(ms)).filter(b => b.start - ms < 30 * 60000 && ok(b)).sort((a, b) => b.start - a.start)[0] || null;
+  let lo = now, hi = now + 6 * 3600e3, best = base.filter(ok).sort((a, b) => b.start - a.start)[0];
+  const atHi = await goodAt(hi); if (atHi) { best = atHi; lo = hi; }
+  while (hi - lo > 15 * 60000) { const mid = (lo + hi) / 2, g = await goodAt(mid); if (g) { lo = mid; best = g.start > (best?.start || 0) ? g : best; } else hi = mid; }
+  if (!best) { $('#wRes').innerHTML = '<div class="plan"><b>No normal journey home tonight.</b></div>'; return; }
+  const legs = best.x.legs, tl = legs.find(l => l.mode.id !== 'walking'), name = tl ? (tl.routeOptions?.[0]?.name || tl.mode.name) : 'Walk';
+  const leave = best.start, late = Math.round((leave - now) / 60000);
+  $('#wRes').innerHTML = `<div class="plan"><h3>${needRail ? 'Last train home' : 'Last good way home'}</h3>
+    <p style="font-size:18px;margin:6px 0">Leave by <b>${hhmm(leave)}</b>${late > 0 ? ` <span class="note">(in ${Math.floor(late / 60) ? Math.floor(late / 60) + ' h ' : ''}${late % 60} min)</span>` : ''}</p>
+    <p>${esc(name)}${tl ? ' from ' + esc(tl.departurePoint.commonName) + ' at ' + hhmm(Date.parse(tl.departureTime)) : ''}, home by ${hhmm(best.arr)} (${best.dur} min).</p>
+    <p class="note">After that you'd need ${needRail ? 'night buses or much slower routes' : 'routes taking over ' + Math.round(lim) + ' min'}.</p>
+    <button class="go" id="lastRem">Remind me 20 min before</button></div>`;
+  $('#lastRem').addEventListener('click', async e => { try { if (Notification.permission === 'default') await Notification.requestPermission(); } catch (er) {} setTimeout(() => { try { new Notification('Last train home soon', {body: `Leave by ${hhmm(leave)} for the ${name}`}); } catch (er) {} try { navigator.vibrate?.([300, 120, 300]); } catch (er) {} }, Math.max(0, leave - 20 * 60000 - Date.now())); e.target.textContent = 'Reminder set (keep this page open)'; });
+}
 drawChips();
-{ const hb = habitNow(); if (hb && origin()) { WQ.auto = true; $('#wq').value = hb.h.name; planTo(hb.h, false); } }
+{ const n = new Date(), soon = (cfg.timetable || []).map(x => ({x, at: nextOcc(x)})).filter(o => o.at - n < 5 * 3600e3).sort((a, b) => a.at - b.at)[0];
+  if (soon && origin()) arriveBy(soon.x, soon.at, `Your ${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][soon.x.dow]} ${soon.x.time} at ${soon.x.name}`); }
+{ const hb = habitNow(); if (hb && origin() && !WQ.to) { WQ.auto = true; $('#wq').value = hb.h.name; planTo(hb.h, false); } }
 
 /* ---------- live run coach: GPS pace vs the departure, spoken and buzzed ----------
    remaining route ≈ straight-line distance × 1.3 (typical street detour factor)
@@ -1038,6 +1149,15 @@ function coachTick(now) {
   }
 }
 setInterval(() => coachTick(Date.now()), 1000);
+
+/* ---------- share my ETA: a link a friend can open; it keeps updating from the same live TfL data ---------- */
+function shareEta(d, p) {
+  if (!d || !p) return;
+  const o = {l: shortName(d), c: d.colour, dest: d.dest, t: Math.round(d.t), from: p.name, stop: p.tflId || '', veh: d.vehicleId || '', line: d.lineId || '', mode: d.mode};
+  const url = new URL('share.html', location.href); url.searchParams.set('d', btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/=+$/, ''));
+  const msg = `I'm catching the ${hhmm(d.t)} ${shortName(d)} from ${p.name}. Live: ${url}`;
+  if (navigator.share) navigator.share({text: msg}).catch(() => {}); else { navigator.clipboard?.writeText(msg); open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank', 'noopener'); }
+}
 
 /* ---------- ask a friend for a lift: exact pick-up time from the live departure ---------- */
 function askLift(p, d) {
@@ -1336,6 +1456,9 @@ function drawStory() {
     Object.entries(days).map(([k, list]) => `<h3>${esc(k)}</h3><ol class="tl">${list.map(s => `<li><span class="tt">${hhmm(s.at - s.mins * 60000)}</span><span><b>${verb[s.mode] || 'Went'} to ${esc(s.place)}</b> in ${Math.round(s.mins)} min${s.line ? `, caught the ${s.dep ? hhmm(s.dep) + ' ' : ''}${esc(s.line)}` : ''}${s.saved >= 1 ? `<br><small class="g">${Math.round(s.saved)} min faster than walking</small>` : ''}<br><small class="note">${Math.round(kcal(s))} kcal${s.dist ? ', ' + (s.dist >= 1000 ? (s.dist / 1000).toFixed(1) + ' km' : s.dist + ' m') : ''}</small></span></li>`).join('')}</ol>`).join('');
 }
 drawStory();
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+let installEv = null; addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEv = e; $('#installBtn').hidden = false; });
+$('#installBtn').addEventListener('click', async () => { if (!installEv) return; installEv.prompt(); await installEv.userChoice; installEv = null; $('#installBtn').hidden = true; });
 new IntersectionObserver(es => { const tb = $('#thumb'), vis = es[0].isIntersecting; tb.hidden = vis || !$('#goBtn') || !!trip; }, {threshold: 0.15}).observe($('#hero'));
 $('#thGo').addEventListener('click', () => $('#goBtn')?.click());
 drawMoney();

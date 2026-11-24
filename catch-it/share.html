@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#FFFFFF">
+<title>Catch It: live ETA</title>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@200;400;600&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#16181D;--muted:#8A8F98;--hair:#ECEDEF;--go:#1E9E5A}
+@media(prefers-color-scheme:dark){:root{--ink:#F3F4F6;--muted:#868B94;--hair:#23252B}body{background:#0F1013}}
+body{margin:0;font-family:"Hanken Grotesk",system-ui,sans-serif;color:var(--ink);display:grid;place-items:center;min-height:100vh;padding:24px;box-sizing:border-box}
+main{max-width:460px;width:100%}
+.pill{display:inline-block;color:#fff;border-radius:999px;padding:3px 12px;font-weight:600;font-size:14px}
+.big{font-weight:200;font-size:clamp(88px,28vw,140px);letter-spacing:-.06em;line-height:.9;margin:18px 0 6px}
+p{font-size:18px;line-height:1.4}.note{color:var(--muted);font-size:14px}
+a{color:inherit}
+</style>
+</head>
+<body><main id="m"><p class="note">Loading…</p></main>
+<script>
+{
+const m = document.getElementById('m'), esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let o = null; try { const s = new URLSearchParams(location.search).get('d'); o = JSON.parse(decodeURIComponent(escape(atob(s)))); } catch (e) {}
+const hhmm = t => new Date(t).toLocaleTimeString('en-GB', {hour: '2-digit', minute: '2-digit'});
+if (!o) m.innerHTML = '<p>This link is not valid.</p>';
+else {
+  let t = o.t, live = false;
+  async function upd() {
+    if (!o.stop || !o.veh) return;
+    try { const a = await (await fetch('https://api.tfl.gov.uk/StopPoint/' + encodeURIComponent(o.stop) + '/Arrivals')).json(); const x = a.find(z => z.vehicleId === o.veh && (!o.line || z.lineId === o.line)); if (x) { t = Date.parse(x.expectedArrival); live = true; } } catch (e) {}
+  }
+  function draw() {
+    const s = Math.round((t - Date.now()) / 1000), gone = s < -60;
+    m.innerHTML = `<span class="pill" style="background:${esc(o.c || '#16181D')}">${esc(o.l)}</span>
+      <p style="margin-top:14px">Your friend is catching the <b>${hhmm(t)}</b> to ${esc(o.dest)} from ${esc(o.from)}.</p>
+      <div class="big">${gone ? 'Left' : s <= 30 ? 'Now' : Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0')}</div>
+      <p class="note">${gone ? 'This departure has gone.' : 'until it leaves'}${live ? ', updating live from TfL' : ''}.</p>
+      <p class="note" style="margin-top:28px">Shared from <a href="./">Catch It</a>, the app that shows every bus and train you can still catch.</p>`;
+  }
+  upd().then(draw); setInterval(draw, 1000); setInterval(() => upd(), 30000);
+}
+}
+</script>
+</body>
+</html>

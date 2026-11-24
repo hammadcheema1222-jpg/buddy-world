@@ -222,3 +222,16 @@ button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{ou
 .thumb[hidden]{display:none}
 .thumb span{font-weight:500}.thumb button{background:var(--bg);color:var(--ink);padding:0 20px}
 @media (min-width:701px){.thumb{bottom:20px;left:50%;right:auto;transform:translateX(-50%);width:min(560px,calc(100% - 24px))}}
+.when2{display:flex;gap:6px;align-items:center;margin-top:10px;flex-wrap:wrap}
+.when2 button{background:var(--fill);min-height:36px;padding:0 14px;font-size:14px;color:var(--muted)}
+.when2 button[aria-pressed=true]{background:var(--ink);color:var(--bg)}
+.when2 input{min-height:36px;width:auto;padding:0 10px;border-radius:999px}
+.radar{margin-top:22px;border-radius:20px;background:var(--fill);padding:12px 16px}
+.radar h3{margin:0 0 6px;font-size:15px;font-weight:600}
+.radar details{border-top:1px solid var(--hair);padding:8px 0}.radar details:first-of-type{border-top:0}
+.radar summary{cursor:pointer;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.radar p{margin:6px 0 0;font-size:14px;color:var(--soft)}
+.crowd{margin:0 0 8px;font-size:14px;color:var(--risk)}
+.rain{color:#2f6fde}
+.install{position:fixed;right:14px;top:70px;z-index:20;background:var(--ink);color:var(--bg);padding:0 16px;box-shadow:var(--float)}
+.install[hidden]{display:none}

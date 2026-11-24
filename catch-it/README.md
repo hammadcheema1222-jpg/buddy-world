@@ -11,6 +11,11 @@
 | `station.html` Station | Entrance-to-platform time from OpenStreetMap indoor data: quickest, step-free or no-lift routes, crowd-adjusted walking speed, live TfL lift problems |
 
 ## Making the train
+- **Arrive by** and **weekly trips**: the latest time you can leave for each way of getting there, leave = first departure − your travel − buffer − 0.84σ. Save it as a weekly trip and it opens by itself on the day.
+- **Last train home**: a binary search over tonight's TfL journeys finds the latest one that still uses a train and isn't much slower than the quickest. There's a reminder 20 minutes before.
+- **Rain window**: Open-Meteo 15-minute rain against your walk, so it can suggest a later train with a dry walk.
+- **Disruption radar** (TfL live and planned status for the next 7 days) and **how busy** (TfL live crowding vs normal, which adds platform time when it's busy).
+- **Installable app**: a web manifest and an offline service worker. The last departures are kept for underground use. **Share my ETA** creates a live link (share.html) that keeps updating from TfL.
 - **Maths for design**: greedy collision-free label placement on the rings; WCAG contrast (L₁+0.05)/(L₂+0.05) with an OKLCH lightness search so every line colour stays readable; ±2σ uncertainty clouds from the Kalman variance; a Sarkar–Brown fisheye (d+1)x/(dx+1) on the next-hour strip; Pareto filtering of dominated departures; critically damped springs (c = 2√k) for motion; a Fitts's-law thumb bar; and a radial **Time map** cartogram (angle = real direction, radius = minutes until you're on board).
 - **Physics of getting there**: live wind (Open-Meteo) in a power balance c·v + ½ρ·CdA·(v+w)²·v = P; hills with Tobler's hiking function e^(−3.5·|grade+0.05|) and climbing force for bikes; Riegel's tiredness law for longer runs. The catch rings bend with the wind.
 - **Learns each train**: Welford running stats of "real departure − first shown" and (with Darwin) lateness vs timetable, per stop/line/weekday/hour, shrunk toward zero with a 3-sighting prior. You see things like "usually 2 min late".
