@@ -1,0 +1,7 @@
+name: 🛍️ Mall shop location
+description: Add or fix where a shop is inside a shopping centre
+labels: [mall-data]
+body:
+  - type: textarea
+    attributes: {label: Shop details, description: "Filled in by the app (name, level, position). Add anything else you know.", render: json}
+    validations: {required: true}

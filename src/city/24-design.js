@@ -25,7 +25,7 @@ const svgI=(k,s)=>'<svg viewBox="0 0 24 24" width="'+(s||22)+'" height="'+(s||22
  #top button.tab.on{background:rgba(240,154,62,.16)!important;color:#b35d00;box-shadow:none!important}
  #top{gap:4px!important;background:var(--surface)!important}
  @media (max-width:760px){#top button.tab{flex:1 1 0;min-width:0!important;padding:6px 0}#bFs{display:none!important}#hud{max-width:calc(100vw - 118px)!important}#hud #wx{font-size:12px!important}}
- @media (min-width:761px){#top button.tab{flex-direction:row;gap:6px;padding:7px 12px}#top button.tab span{font-size:13px}}
+ @media (min-width:1280px){#top button.tab{flex-direction:row;gap:6px;padding:7px 12px}#top button.tab span{font-size:13px}}@media (min-width:761px) and (max-width:1279px){#top button.tab{min-width:52px;padding:4px 6px}#top button.tab svg{width:20px;height:20px}}
  /* side controls: 2 always-on + a "more" menu */
  #qbWrap{gap:8px!important}#qbWrap button{width:44px!important;height:44px!important;border-radius:50%!important;display:flex;align-items:center;justify-content:center;color:var(--ink);background:var(--surface);border:1px solid rgba(107,79,46,.35)}
  #qbWrap .qbx{display:none}#qbWrap.open .qbx{display:flex}#qbWrap button.qbm{background:var(--ink);color:#fff}
