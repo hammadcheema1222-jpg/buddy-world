@@ -34,8 +34,11 @@ nav a[aria-current]{background:var(--ink);color:var(--bg)}
 .panel h2{margin:0;font-size:18px}
 .panel h3{margin:14px 0 6px;font-size:15px}
 .note{font-size:13px;color:var(--muted)}
-.seg{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-top:10px}
-.seg button{border:0;border-radius:0;min-height:46px}
+.seg{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-top:10px}
+.seg button{border:0;border-radius:0;min-height:46px;padding:0 4px;font-size:15px}
+#go,#gk{width:100%;min-height:48px;border-radius:12px;border:1px solid var(--line);padding:0 14px;font:inherit;background:var(--panel);color:var(--ink)}
+.card{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:10px;background:var(--panel)}
+.glogo{position:absolute;left:10px;bottom:8px;z-index:2;height:18px;display:none}.glogo.on{display:block}
 .seg button[aria-pressed=true]{background:var(--ink);color:var(--bg)}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}
 .row2 button[aria-pressed=true]{background:var(--ink);color:var(--bg)}
@@ -56,7 +59,7 @@ details summary{cursor:pointer;font-weight:600;font-size:14px;margin:8px 0}
 .frame.on{display:block}
 .me{width:16px;height:16px;border-radius:50%;background:#2f6fde;border:3px solid #fff;box-shadow:0 0 0 2px #2f6fde}
 .grab{display:none}
-@media(max-width:700px){.panel{top:auto;bottom:0;left:0;width:100%;max-height:52%;border-radius:16px 16px 0 0}.panel.min{max-height:118px;overflow:hidden}.grab{display:block;width:100%;min-height:24px;border:0;background:none;padding:0}.grab::before{content:"";display:block;width:44px;height:5px;border-radius:3px;background:var(--line);margin:0 auto}nav a{padding:8px}.logo span{display:none}}
+@media(max-width:700px){.panel{top:auto;bottom:0;left:0;width:100%;max-height:52%;border-radius:16px 16px 0 0}.panel.min{max-height:168px;overflow:hidden}.grab{display:block;width:100%;min-height:24px;border:0;background:none;padding:0}.grab::before{content:"";display:block;width:44px;height:5px;border-radius:3px;background:var(--line);margin:0 auto}nav a{padding:8px}.logo span{display:none}}
 </style>
 </head>
 <body>
@@ -65,25 +68,31 @@ details summary{cursor:pointer;font-weight:600;font-size:14px;margin:8px 0}
 <div id="map"></div>
 <aside class="panel min" id="panel">
   <button class="grab" id="grab" aria-label="Show or hide the panel"></button>
-  <h2>Live map</h2>
-  <p class="note" id="status">Loading your lines…</p>
-  <div class="seg" role="group" aria-label="View"><button data-v="map">Map</button><button data-v="sat">Satellite</button><button data-v="3d">3D world</button></div>
-  <div id="w3d" class="note" style="margin-top:8px"><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="realB" checked> Real 3D buildings, roofs, domes and trees</label><span id="w3s"></span>
-  <label style="display:block;margin-top:6px">Hills and mountains: <b><span id="exT">1.0</span>× height</b><input type="range" id="exag" min="1" max="3" step="0.1" value="1" style="width:100%;accent-color:#6950a1"></label></div>
-  <h3>Go anywhere</h3>
-  <input id="go" placeholder="e.g. The O2, Snowdon, Big Ben" autocomplete="off" style="width:100%;min-height:44px;border-radius:10px;border:1px solid var(--line);padding:0 12px;font:inherit;background:var(--bg);color:var(--ink)">
+  <input id="go" type="search" placeholder="Search anywhere: The O2, Snowdon, Big Ben" autocomplete="off" aria-label="Search any place">
   <div id="goRes" class="chips" style="margin-top:6px"></div>
+  <div class="seg" role="group" aria-label="View"><button data-v="map">Map</button><button data-v="sat">Satellite</button><button data-v="3d">3D</button><button data-v="real">Photo-real</button></div>
+  <p class="note" id="status" style="margin:6px 2px 0">Loading your lines…</p>
+  <div id="gkBox" class="card" hidden>
+    <b>Photo-real 3D needs a free Google key</b>
+    <p class="note" style="margin:4px 0 8px">Google's Photorealistic 3D Tiles are free for 1,000 visits a month (each lasts 3 hours). Paste a Map Tiles API key. It stays on this device.</p>
+    <input id="gk" placeholder="AIza…" autocomplete="off" spellcheck="false"><div class="row2"><button class="main" id="gkSave">Use key</button><button id="gkNo">Not now</button></div>
+  </div>
+  <p class="note" id="pmsg" hidden></p><p class="note" id="gAttr" hidden></p>
   <h3>Ride a real train or bus</h3>
   <select id="route" aria-label="Line and direction"></select>
-  <div class="row2"><button class="main" id="ride">Ride the next one (live)</button><button id="preview">Fast preview</button></div>
+  <div class="row2"><button class="main" id="ride">Ride the next one</button><button id="preview">Quick preview</button></div>
   <div id="seat" class="note" style="margin-top:8px">Pick a line to see which side to sit on.</div>
   <select id="pref" aria-label="Sun preference"><option value="avoid">I'd rather avoid the sun</option><option value="like">I like the sun</option></select>
-  <h3>Lines on the map</h3>
-  <div class="chips" id="rail"></div>
-  <details id="busBox"><summary id="busSum">Buses at your stops</summary><div class="chips" id="bus"></div></details>
-  <p class="note" style="margin-top:12px">Powered by TfL Open Data. Imagery © Esri, Maxar, Earthstar Geographics. Terrain: AWS Terrain Tiles (Mapzen). 3D buildings, roofs and trees © OpenStreetMap contributors via Overpass. Search: Photon by komoot. Map © OpenFreeMap, © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors.</p>
+  <details><summary>Lines on the map</summary><div class="chips" id="rail"></div>
+  <details id="busBox"><summary id="busSum">Buses at your stops</summary><div class="chips" id="bus"></div></details></details>
+  <details id="w3d"><summary>3D options</summary>
+  <label style="display:flex;gap:8px;align-items:center" class="note"><input type="checkbox" id="realB" checked> Real buildings, roofs, domes and trees</label><span id="w3s" class="note"></span>
+  <label style="display:block;margin-top:6px" class="note">Hills and mountains: <b><span id="exT">1.0</span>× height</b><input type="range" id="exag" min="1" max="3" step="0.1" value="1" style="width:100%;accent-color:#6950a1"></label>
+  <button id="gkEdit" style="margin-top:6px;width:100%">Google photo-real key…</button></details>
+  <p class="note" style="margin-top:12px;font-size:11px">Photo-real 3D: Google Map Tiles (when on). Powered by TfL Open Data. Imagery © Esri, Maxar, Earthstar Geographics. Terrain: AWS Terrain Tiles (Mapzen). 3D buildings, roofs and trees © OpenStreetMap contributors via Overpass. Search: Photon by komoot. Map © OpenFreeMap, © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors.</p>
 </aside>
 <div class="frame" id="frame"></div>
+<img class="glogo" id="glogo" alt="Google" src="https://developers.google.com/static/maps/documentation/images/google_on_non_white.png">
 <div class="hud" id="hud"><span id="hudTxt">Riding…</span><button data-look="C">Outside</button><button data-look="L">Left</button><button data-look="F">Front</button><button data-look="R">Right</button><button id="hudStop">Stop</button></div>
 
 <script src="https://unpkg.com/maplibre-gl@5.24.1/dist/maplibre-gl.js"></script>
@@ -121,9 +130,13 @@ function solar(lat, lon, t) {
 
 /* ---------- styles: map, satellite, 3D world ---------- */
 const FONTS = 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf';
+/* real-world facade palette: London stock brick, red brick, Portland stone, render, concrete; tall buildings glass and steel */
+// map tiles merge whole blocks into one shape, so colour by height: low brick terraces → stone/concrete → glass towers; OSM building:colour wins
+const BLD_COL = ['case', ['has', 'colour'], ['to-color', ['get', 'colour'], '#a7765e'],
+  ['interpolate', ['linear'], ['coalesce', ['get', 'render_height'], 8], 0, '#a26f58', 10, '#a87d64', 18, '#b3a08a', 35, '#a8a49c', 70, '#8c9eae']];
 function satStyle(buildings) {
   const layers = [{id: 'sat', type: 'raster', source: 'sat', paint: {'raster-fade-duration': 150}}];
-  if (buildings) layers.push({id: 'bld', type: 'fill-extrusion', source: 'omt', 'source-layer': 'building', minzoom: 14, paint: {'fill-extrusion-color': ['interpolate', ['linear'], ['coalesce', ['get', 'render_height'], 8], 0, '#cfc8bd', 30, '#e2ded6', 120, '#eef0f2'], 'fill-extrusion-height': ['coalesce', ['get', 'render_height'], 8], 'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0], 'fill-extrusion-opacity': 0.92, 'fill-extrusion-vertical-gradient': true}});
+  if (buildings) layers.push({id: 'bld', type: 'fill-extrusion', source: 'omt', 'source-layer': 'building', minzoom: 14, paint: {'fill-extrusion-color': BLD_COL, 'fill-extrusion-height': ['coalesce', ['get', 'render_height'], 8], 'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0], 'fill-extrusion-opacity': 1, 'fill-extrusion-vertical-gradient': true}});
   layers.push({id: 'road-names', type: 'symbol', source: 'omt', 'source-layer': 'transportation_name', minzoom: 15, layout: {'text-field': ['get', 'name'], 'text-font': ['Noto Sans Regular'], 'symbol-placement': 'line', 'text-size': 12}, paint: {'text-color': '#ffffff', 'text-halo-color': 'rgba(0,0,0,.75)', 'text-halo-width': 1.4}});
   layers.push({id: 'place-names', type: 'symbol', source: 'omt', 'source-layer': 'place', layout: {'text-field': ['get', 'name'], 'text-font': ['Noto Sans Bold'], 'text-size': 13}, paint: {'text-color': '#ffffff', 'text-halo-color': 'rgba(0,0,0,.8)', 'text-halo-width': 1.6}});
   return {version: 8, glyphs: FONTS, sources: {
@@ -131,22 +144,29 @@ function satStyle(buildings) {
     omt: {type: 'vector', url: 'https://tiles.openfreemap.org/planet', attribution: '© OpenFreeMap © OpenStreetMap'}
   }, layers};
 }
+const realStyle = () => ({version: 8, glyphs: FONTS, sources: {}, layers: [{id: 'bg', type: 'background', paint: {'background-color': '#202436'}}]});
+const styleFor = v => v === 'map' ? 'https://tiles.openfreemap.org/styles/liberty' : v === 'real' ? realStyle() : satStyle(v === '3d');
+const deep = v => v === '3d' || v === 'real';
+if (cfg.view === 'real' && !gKey()) cfg.view = '3d';
 const home = cfg.places.find(p => p.lat) || (cfg.home ? {lat: cfg.home[1], lon: cfg.home[0]} : {lat: 51.5074, lon: -0.1278});
-const map = new maplibregl.Map({container: 'map', style: cfg.view === 'map' ? 'https://tiles.openfreemap.org/styles/liberty' : satStyle(cfg.view === '3d'), center: [home.lon, home.lat], zoom: cfg.view === '3d' ? 16 : 14.5, pitch: cfg.view === '3d' ? 60 : 0, maxPitch: 85, attributionControl: {compact: true}});
+const map = new maplibregl.Map({container: 'map', style: styleFor(cfg.view), center: [home.lon, home.lat], zoom: deep(cfg.view) ? 16 : 14.5, pitch: deep(cfg.view) ? 60 : 0, maxPitch: 85, attributionControl: {compact: true}});
 map.addControl(new maplibregl.NavigationControl({visualizePitch: true}), 'top-right');
 for (const p of cfg.places) if (p.lat) { const el = document.createElement('div'); el.className = 'me'; el.title = p.name; new maplibregl.Marker({element: el}).setLngLat([p.lon, p.lat]).setPopup(new maplibregl.Popup({offset: 10}).setText(p.name)).addTo(map); }
 const O = maplibregl.MercatorCoordinate.fromLngLat([home.lon, home.lat], 0), S = O.meterInMercatorCoordinateUnits();
 function setView(v) {
-  cfg.view = v; save();
+  if (v === 'real' && !gKey()) { $('#gkBox').hidden = false; $('#panel').classList.remove('min'); $('#gk').focus(); return; }
+  cfg.view = v; save(); $('#gkBox').hidden = true;
   document.querySelectorAll('.seg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === v)));
-  map.setStyle(v === 'map' ? 'https://tiles.openfreemap.org/styles/liberty' : satStyle(v === '3d'));
-  map.easeTo({pitch: v === '3d' ? 60 : 0, zoom: v === '3d' ? Math.max(map.getZoom(), 15.5) : map.getZoom(), duration: 900});
+  if (v !== 'real') Photo.off();
+  map.setStyle(styleFor(v));
+  map.easeTo({pitch: deep(v) ? 60 : 0, zoom: deep(v) ? Math.max(map.getZoom(), 15.5) : map.getZoom(), duration: 900});
 }
 document.querySelectorAll('.seg button').forEach(b => { b.setAttribute('aria-pressed', String(b.dataset.v === cfg.view)); b.addEventListener('click', () => setView(b.dataset.v)); });
 map.on('style.load', addOverlays);
 function addOverlays() {
-  const is3d = cfg.view === '3d';
-  if (is3d) {
+  const is3d = deep(cfg.view);
+  if (cfg.view === 'map') { try { if (map.getLayer('building-3d')) { map.setPaintProperty('building-3d', 'fill-extrusion-color', BLD_COL); map.setPaintProperty('building-3d', 'fill-extrusion-opacity', 1); } } catch (e) {} }
+  if (cfg.view === '3d') {
     if (!map.getSource('dem')) map.addSource('dem', {type: 'raster-dem', tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], encoding: 'terrarium', tileSize: 256, maxzoom: 15, attribution: 'Terrain: AWS Terrain Tiles'});
     try { map.setTerrain({source: 'dem', exaggeration: cfg.exag || 1}); } catch (e) {}
     if (!map.getSource('demh')) map.addSource('demh', {type: 'raster-dem', tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], encoding: 'terrarium', tileSize: 256, maxzoom: 15});
@@ -156,6 +176,7 @@ function addOverlays() {
   map.addSource('veh', {type: 'geojson', data: {type: 'FeatureCollection', features: []}});
   map.addLayer({id: 'veh-dot', type: 'circle', source: 'veh', paint: {'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 4, 15, 8], 'circle-color': ['get', 'c'], 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 2, 'circle-opacity': is3d ? ['interpolate', ['linear'], ['zoom'], 14.5, 1, 15.5, 0] : 1, 'circle-stroke-opacity': is3d ? ['interpolate', ['linear'], ['zoom'], 14.5, 1, 15.5, 0] : 1}});
   map.addLayer({id: 'veh-lbl', type: 'symbol', source: 'veh', minzoom: 14, maxzoom: is3d ? 15.5 : 24, layout: {'text-field': ['get', 'l'], 'text-font': ['Noto Sans Bold'], 'text-size': 11, 'text-offset': [0, -1.4], 'text-allow-overlap': false}, paint: {'text-color': '#ffffff', 'text-halo-color': ['get', 'c'], 'text-halo-width': 2.2}});
+  if (cfg.view === 'real') Photo.on();
   if (is3d) { for (const k in veh) veh[k].model = null; map.addLayer(threeLayer()); }
   sky();
 }
@@ -168,6 +189,59 @@ function sky() {
   if (three) { const d = new THREE.Vector3(Math.sin(s.az) * Math.cos(s.el), Math.max(0.15, Math.sin(s.el)), -Math.cos(s.az) * Math.cos(s.el)); three.sun.position.copy(d); three.sun.intensity = day ? 0.95 : 0.25; three.hemi.intensity = day ? 0.8 : 0.35; }
 }
 setInterval(sky, 300000);
+
+/* ---------- our own elevation sampler (Terrarium PNG: h = R*256 + G + B/256 - 32768) ---------- */
+const Dem = (() => {
+  const Z = 14, tiles = {};
+  function load(x, y) {
+    const k = x + '/' + y; if (tiles[k]) return tiles[k]; tiles[k] = {d: null};
+    const im = new Image(); im.crossOrigin = 'anonymous';
+    im.onload = () => { const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d', {willReadFrequently: true}); g.drawImage(im, 0, 0); tiles[k].d = g.getImageData(0, 0, 256, 256).data; };
+    im.src = `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${Z}/${x}/${y}.png`; return tiles[k];
+  }
+  return {at(p) {
+    const n = 2 ** Z, fx = (p[0] + 180) / 360 * n, la = p[1] * DEG, fy = (1 - Math.log(Math.tan(la) + 1 / Math.cos(la)) / Math.PI) / 2 * n;
+    const t = load(Math.floor(fx), Math.floor(fy)); if (!t.d) return 0;
+    const i = (Math.min(255, Math.floor((fy % 1) * 256)) * 256 + Math.min(255, Math.floor((fx % 1) * 256))) * 4;
+    return t.d[i] * 256 + t.d[i + 1] + t.d[i + 2] / 256 - 32768;
+  }};
+})();
+
+/* ---------- Google Photorealistic 3D Tiles via deck.gl, drawn inside MapLibre ---------- */
+function gKey() { return cfg.gKey || window.CATCHIT_GKEY || ''; }
+const Photo = {
+  N: 0, ov: null, cal: 0,
+  async lib() { if (window.deck) return; await new Promise((ok, no) => { const s = document.createElement('script'); s.src = 'https://unpkg.com/deck.gl@9.1.15/dist.min.js'; s.onload = ok; s.onerror = no; document.head.appendChild(s); }); },
+  // geoid height: Google tiles sit on the WGS84 ellipsoid; UK sea level is ~45-55 m above it. Start from a rough value, then measure it.
+  guessN(c) { return c.lng > -11 && c.lng < 3 && c.lat > 49 && c.lat < 61 ? 47 : 0; },
+  async on() {
+    const key = gKey(); if (!key) return;
+    this.msg('Loading Google photo-real 3D…');
+    try { await this.lib(); } catch (e) { this.msg('Could not load the 3D renderer. Check your connection.'); return; }
+    this.N = this.guessN(map.getCenter()); this.cal = 0;
+    const layer = new deck.Tile3DLayer({id: 'g3d', data: 'https://tile.googleapis.com/v1/3dtiles/root.json', loadOptions: {fetch: (u, o) => fetch(u, {...(o || {}), headers: {'X-GOOG-API-KEY': key}}).then(r => { if (!r.ok && /root\.json/.test(u)) this.fail(r.status); return r; })},
+      operation: 'terrain+draw', pickable: true,
+      onTilesetLoad: ts => { this.msg(''); ts.options.onTraversalComplete = sel => { const cr = new Set(); sel.forEach(t => (t.content?.gltf?.asset?.copyright || '').split(';').forEach(s => s.trim() && cr.add(s.trim()))); const a = $('#gAttr'); a.hidden = !cr.size; a.textContent = 'Map data: ' + [...cr].join(', '); return sel; }; },
+      onTileError: e => this.fail(e)});
+    const before = map.getStyle().layers.find(l => l.id !== 'bg')?.id;
+    if (!this.ov) { this.ov = new deck.MapboxOverlay({interleaved: true, layers: [], onError: e => { this.fail(e); return true; }}); map.addControl(this.ov); }
+    this.ov.setProps({layers: [before ? layer.clone({beforeId: before}) : layer]});
+    $('#glogo').classList.add('on');
+  },
+  msg(s) { const m = $('#pmsg'); m.hidden = !s; m.textContent = s; },
+  fail(e) { const s = String(e?.message || e); this.msg(/40[13]/.test(s) ? 'Google turned the key down. In Google Cloud, enable "Map Tiles API" for this key and allow this website.' : /429/.test(s) ? 'Google\'s free daily limit is used up. Try again tomorrow.' : 'Some photo-real tiles did not load.'); },
+  off() { this.msg(''); if (this.ov) { try { map.removeControl(this.ov); } catch (e) {} this.ov = null; } $('#glogo').classList.remove('on'); $('#gAttr').hidden = true; },
+  calibrate() {   // pick the photo mesh across the screen; ground hits give (ellipsoid height - DEM) = local geoid offset
+    if (!this.ov || cfg.view !== 'real' || Date.now() - this.cal < 8000) return; this.cal = Date.now();
+    const c = map.getCanvas(), w = c.clientWidth, h = c.clientHeight, d = [];
+    for (let i = 1; i < 6; i++) for (let j = 2; j < 6; j++) { try { const r = this.ov.pickObject({x: w * i / 6, y: h * j / 6, unproject3D: true}); const q = r?.coordinate; if (q && q.length > 2) { const g = Dem.at(q); if (g) d.push(q[2] - g); } } catch (e) {} }
+    if (d.length >= 4) { d.sort((a, b) => a - b); const n = d[Math.floor(d.length * 0.2)]; if (n > -110 && n < 95) this.N = Math.round(n * 10) / 10; }
+  }
+};
+map.on('idle', () => Photo.calibrate());
+// deck.gl reports a refused root tileset as an unhandled rejection: turn it into a friendly message
+addEventListener('unhandledrejection', e => { const s = String(e.reason?.message || e.reason); if (/googleapis/.test(s)) { e.preventDefault(); Photo.fail(s); } });
+addEventListener('error', e => { const s = String(e.message || e.error); if (/googleapis/.test(s)) { e.preventDefault(); Photo.fail(s); } });
 
 /* ---------- 3D vehicles (Three.js inside MapLibre) ---------- */
 let three = null;
@@ -219,7 +293,7 @@ function threeLayer() {
       this.hemi = new THREE.HemisphereLight(0xffffff, 0x4b5563, 0.8); this.scene.add(this.hemi);
       this.sun = new THREE.DirectionalLight(0xffffff, 0.95); this.scene.add(this.sun);
       this.renderer = new THREE.WebGLRenderer({canvas: m.getCanvas(), context: gl, antialias: true}); this.renderer.autoClear = false;
-      this.group = new THREE.Group(); this.scene.add(this.group); three = this; sky(); window.World3D?.attach(this);
+      this.group = new THREE.Group(); this.scene.add(this.group); three = this; sky(); if (cfg.view === '3d') window.World3D?.attach(this);
     },
     render(gl, args) {
       place3D();
@@ -232,7 +306,7 @@ function threeLayer() {
     onRemove() { three = null; window.World3D?.detach(); }
   };
 }
-const elev = p => { try { return map.queryTerrainElevation(p) || 0; } catch (e) { return 0; } };
+const elev = p => { if (cfg.view === 'real') return Dem.at(p) + Photo.N; try { return map.queryTerrainElevation(p) || 0; } catch (e) { return 0; } };
 window.CI = {map, local, elev, onStatus: () => { const s = $('#w3s'); if (s) s.textContent = window.World3D?.status || ''; }};
 map.on('moveend', () => { if (cfg.view === '3d') window.World3D?.update(); });
 map.on('idle', () => { if (cfg.view === '3d') { window.World3D?.update(); window.World3D?.reground(); } });
@@ -449,6 +523,10 @@ async function poll() {
 }
 map.once('load', init);
 $('#grab').addEventListener('click', () => $('#panel').classList.toggle('min'));
+$('#gkSave').addEventListener('click', () => { const k = $('#gk').value.trim(); if (!/^AIza[\w-]{30,}$/.test(k)) { $('#gk').setCustomValidity('That does not look like a Google API key'); $('#gk').reportValidity(); return; } cfg.gKey = k; try { const all = JSON.parse(localStorage.getItem('catchit.v1') || '{}'); all.gKey = k; localStorage.setItem('catchit.v1', JSON.stringify(all)); } catch (e) {} setView('real'); });
+$('#gk').addEventListener('input', () => $('#gk').setCustomValidity(''));
+$('#gkNo').addEventListener('click', () => { $('#gkBox').hidden = true; });
+$('#gkEdit').addEventListener('click', () => { $('#gk').value = cfg.gKey || ''; $('#gkBox').hidden = false; });
 $('#exag').value = cfg.exag || 1; $('#exT').textContent = (+$('#exag').value).toFixed(1);
 $('#exag').addEventListener('input', e => { cfg.exag = +e.target.value; $('#exT').textContent = cfg.exag.toFixed(1); try { if (map.getTerrain()) map.setTerrain({source: 'dem', exaggeration: cfg.exag}); } catch (er) {} save(); });
 $('#realB').addEventListener('change', e => { if (window.World3D) { window.World3D.on = e.target.checked; if (!e.target.checked) { try { map.setLayerZoomRange('bld', 14, 24); } catch (er) {} } window.World3D.update(); map.triggerRepaint(); } });
@@ -459,7 +537,7 @@ async function goSearch(q) {
     const r = await getJSON('https://photon.komoot.io/api/?limit=5&lang=en&q=' + encodeURIComponent(q));
     const fs = r.features || [];
     $('#goRes').innerHTML = fs.map((f, i) => `<button data-g="${i}" style="min-height:38px">${esc(f.properties.name || q)}${f.properties.city ? ', ' + esc(f.properties.city) : f.properties.country ? ', ' + esc(f.properties.country) : ''}</button>`).join('') || '<span class="note">No match.</span>';
-    $('#goRes').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { const f = fs[+b.dataset.g]; if (cfg.view !== '3d') setView('3d'); map.flyTo({center: f.geometry.coordinates, zoom: 16.3, pitch: 62, bearing: 20, duration: 3500}); }));
+    $('#goRes').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { const f = fs[+b.dataset.g]; if (!deep(cfg.view)) setView('3d'); map.flyTo({center: f.geometry.coordinates, zoom: 16.3, pitch: 62, bearing: 20, duration: 3500}); }));
   } catch (e) { $('#goRes').innerHTML = '<span class="note">Search unavailable right now.</span>'; }
 }
 
@@ -516,7 +594,7 @@ $('#pref').addEventListener('change', advise);
 let ride = null;
 function startRide(live) {
   const o = routeOpts[+$('#route').value]; if (!o) { $('#seat').textContent = 'Choose a line and direction first.'; return; }
-  if (cfg.view !== '3d') setView('3d');
+  if (!deep(cfg.view)) setView('3d');
   let v = null;
   if (live) {
     const idx = id => o.allIds.indexOf(id), mineIdx = o.allIds.findIndex(id => mine(o.l, id));

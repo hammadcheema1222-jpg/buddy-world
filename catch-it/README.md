@@ -19,6 +19,9 @@
 - **Sun and sky** use the solar-position formula for your time and place, and windows light up at night.
 - **Go anywhere**: search any place on Earth (Photon/OSM geocoder) and fly there.
 
+- **Photo-real mode (optional)**: Google Photorealistic 3D Tiles drawn with deck.gl inside MapLibre, the same textured city mesh Google Earth uses. You add your own free Map Tiles API key (1,000 free sessions a month, 3 hours each). Google's heights are measured from the WGS84 ellipsoid, so the app measures the local geoid offset by sampling the mesh against the terrain, then puts the trains and buses on it.
+- **No white blocks**: before the real buildings load, simple blocks are coloured by height (brick terraces → stone → glass towers), or by OSM `building:colour`.
+
 ## The maths inside
 - **Catch chance:** both your trip time and the vehicle's time are uncertain (normal curves); P(catch) = Φ((T_vehicle − T_you − buffer) / √(σ_v² + σ_you²)).
 - **Kalman filter** smooths jumpy live predictions so vehicles glide instead of jumping.
