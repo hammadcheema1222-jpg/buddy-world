@@ -11,6 +11,7 @@
 | `station.html` Station | Entrance-to-platform time from OpenStreetMap indoor data: quickest, step-free or no-lift routes, crowd-adjusted walking speed, live TfL lift problems |
 
 ## Making the train
+- **All London** (Map): every Tube, Elizabeth line, Overground, DLR and tram train, live. One request per line returns every vehicle on it, and the lines are refreshed on a rolling cycle (about 1 request every 3 s), so it stays inside TfL's anonymous limit of 50 requests a minute. Buses are added for the stops around the map centre when you zoom in, up to 12 routes at a time.
 - **Arrive by** and **weekly trips**: the latest time you can leave for each way of getting there, leave = first departure − your travel − buffer − 0.84σ. Save it as a weekly trip and it opens by itself on the day.
 - **Last train home**: a binary search over tonight's TfL journeys finds the latest one that still uses a train and isn't much slower than the quickest. There's a reminder 20 minutes before.
 - **Rain window**: Open-Meteo 15-minute rain against your walk, so it can suggest a later train with a dry walk.

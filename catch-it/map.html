@@ -68,7 +68,7 @@ details summary{cursor:pointer;font-weight:600;font-size:14px;margin:8px 0}
 @media(max-width:700px){.fcard{top:70px;left:12px;right:58px;transform:none}.panel.min{max-height:236px!important}}
 </style>
 <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="ui.css?v=1795559079">
+<link rel="stylesheet" href="ui.css?v=1795559467">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -90,7 +90,7 @@ details summary{cursor:pointer;font-weight:600;font-size:14px;margin:8px 0}
     <input id="gk" placeholder="AIza…" autocomplete="off" spellcheck="false"><div class="row2"><button class="main" id="gkSave">Use key</button><button id="gkNo">Not now</button></div>
   </div>
   <p class="note" id="pmsg" hidden></p><p class="note" id="gAttr" hidden></p>
-  <button id="focusBtn" class="main" aria-pressed="false" style="width:100%;margin-top:10px">Focus my train</button>
+  <div class="row2" style="margin-top:10px"><button id="focusBtn" class="main" aria-pressed="false">Focus my train</button><button id="allBtn" aria-pressed="false">All London</button></div>
   <details class="more"><summary>Ride, lines and 3D</summary>
   <h3>Ride a real train or bus</h3>
   <select id="route" aria-label="Line and direction"></select>
@@ -459,7 +459,7 @@ const veh = {};
 function kal(v, z, sigma) { const R = (sigma * 1000) ** 2, Q = 1e8; if (v.P == null || Math.abs(z - v.t) > 180000) { v.t = z; v.P = R; return; } v.P += Q; const K = v.P / (v.P + R); v.t += K * (z - v.t); v.P *= 1 - K; }
 async function pullVehicles(l) {
   let preds = [];
-  if (l.mode === 'bus') preds = await getJSON(TFL + '/Line/' + encodeURIComponent(l.id) + '/Arrivals');
+  if (l.mode === 'bus' || l.all) preds = await getJSON(TFL + '/Line/' + encodeURIComponent(l.id) + '/Arrivals');   // one request = every vehicle on the line
   else {
     const ids = new Set();
     for (const dir in l.order) for (const r of l.order[dir]) { const near = r.ids.findIndex(id => cfg.places.some(p => p.tflId && (p.tflId === id || l.stops[id]?.station === p.tflId))); if (near >= 0) r.ids.slice(Math.max(0, near - 4), near + 5).forEach(i => ids.add(i)); }
@@ -520,6 +520,39 @@ map.on('click', 'veh-dot', e => {
 map.on('mouseenter', 'veh-dot', () => map.getCanvas().style.cursor = 'pointer');
 map.on('mouseleave', 'veh-dot', () => map.getCanvas().style.cursor = '');
 
+/* ---------- All London: every Tube, Elizabeth line, Overground, DLR and tram train live, plus buses where you're looking ----------
+   TfL allows 50 anonymous requests a minute, so lines are refreshed one at a time on a rolling cycle (~1 request every 3 s),
+   and each request returns every vehicle on that line. Buses (700+ routes) are added only for stops near the map centre when zoomed in. */
+const ALL = {on: false, lines: [], bus: [], i: 0, timer: null, busAt: null};
+async function allOn() {
+  ALL.on = true; $('#allBtn').setAttribute('aria-pressed', 'true'); $('#allBtn').textContent = 'All London: on';
+  map.easeTo({center: [-0.11, 51.51], zoom: 10.6, pitch: 0, duration: 1200});
+  if (!ALL.lines.length) {
+    try { const ls = await getJSON(TFL + '/Line/Mode/tube,elizabeth-line,overground,dlr,tram'); ALL.lines = ls.map(x => lines[x.id] || {id: x.id, name: x.name, mode: x.modeName}); } catch (e) { $('#status').textContent = 'Could not reach TfL for the line list.'; return; }
+    ALL.lines.forEach(l => { l.all = true; l.colour = l.colour || LINE_COL[l.id] || '#3b3f5c'; lines[l.id] = l; });
+  }
+  for (const l of ALL.lines) { if (!ALL.on) return; await loadRoute(l); if (!ALL.on) return; drawLine(l); await new Promise(r => setTimeout(r, 120)); }
+  clearInterval(ALL.timer);
+  ALL.timer = setInterval(async () => { if (!ALL.on || document.hidden) return; const pool = ALL.lines.concat(ALL.bus); if (!pool.length) return; const l = pool[ALL.i++ % pool.length]; try { await pullVehicles(l); } catch (e) {} $('#status').textContent = `${Object.keys(veh).length} live vehicles across London`; }, 3000);
+  allBuses();
+}
+function allOff() {
+  ALL.on = false; clearInterval(ALL.timer); $('#allBtn').setAttribute('aria-pressed', 'false'); $('#allBtn').textContent = 'All London';
+  for (const l of ALL.lines.concat(ALL.bus)) { if (cfg.mapLines.includes(l.id)) continue; hideLine(l); for (const k in veh) if (veh[k].line === l) removeVeh(k); }
+  ALL.bus = []; const c = (cfg.places.find(p => p.lat)); if (c) map.easeTo({center: [c.lon, c.lat], zoom: 15, pitch: cfg.view === 'map' ? 45 : 0, duration: 1000});
+}
+async function allBuses() {   // buses at stops within 450 m of the map centre, at most 12 routes at a time
+  if (!ALL.on || map.getZoom() < 14.3) return; const c = map.getCenter();
+  if (ALL.busAt && hav(ALL.busAt, [c.lng, c.lat]) < 400) return; ALL.busAt = [c.lng, c.lat];
+  try {
+    const r = await getJSON(`${TFL}/StopPoint?lat=${c.lat.toFixed(5)}&lon=${c.lng.toFixed(5)}&stopTypes=NaptanPublicBusCoachTram&radius=450&modes=bus`);
+    const ids = [...new Set((r.stopPoints || []).flatMap(s => (s.lines || []).map(x => x.id)))].slice(0, 8);
+    for (const id of ids) { if (ALL.bus.some(b => b.id === id)) continue; const l = lines[id] || {id, name: id.toUpperCase(), mode: 'bus'}; l.all = true; l.colour = '#c8102e'; lines[id] = l; ALL.bus.push(l); await loadRoute(l); if (ALL.on) drawLine(l); }
+    while (ALL.bus.length > 12) { const old = ALL.bus.shift(); if (!cfg.mapLines.includes(old.id)) { hideLine(old); for (const k in veh) if (veh[k].line === old) removeVeh(k); } }
+  } catch (e) {}
+}
+map.on('moveend', () => { if (ALL.on) allBuses(); });
+
 /* ---------- focus: your next catchable vehicle, its route bold, everything else faded ---------- */
 const FOCUS = {k: null, follow: false, on: false, at: 0};
 function placeFor(v) { return cfg.places.find(p => p.tflId && (p.tflId === v.next || v.line.stops?.[v.next]?.station === p.tflId)); }
@@ -578,6 +611,7 @@ async function poll() {
 map.once('load', init);
 $('#grab').addEventListener('click', () => $('#panel').classList.toggle('min'));
 $('#focusBtn').addEventListener('click', () => setFocus(!FOCUS.on));
+$('#allBtn').addEventListener('click', () => ALL.on ? allOff() : allOn());
 if (!gKey()) { document.querySelector('.seg [data-v=real]')?.remove(); document.querySelector('.seg').style.gridTemplateColumns = 'repeat(3,1fr)'; }   // photo-real stays hidden until a Google key is added in 3D options
 $('#gkSave').addEventListener('click', () => { const k = $('#gk').value.trim(); if (!/^AIza[\w-]{30,}$/.test(k)) { $('#gk').setCustomValidity('That does not look like a Google API key'); $('#gk').reportValidity(); return; } cfg.gKey = k; try { const all = JSON.parse(localStorage.getItem('catchit.v1') || '{}'); all.gKey = k; localStorage.setItem('catchit.v1', JSON.stringify(all)); } catch (e) {} setView('real'); });
 $('#gk').addEventListener('input', () => $('#gk').setCustomValidity(''));
