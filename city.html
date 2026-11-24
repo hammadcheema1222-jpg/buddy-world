@@ -65,12 +65,17 @@ const scene=new THREE.Scene();scene.fog=new THREE.Fog(0x9fc9e6,600,1800);const c
 function resize(){renderer.setSize(innerWidth,innerHeight,false);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();}addEventListener('resize',resize);resize();
 const hemi=new THREE.HemisphereLight(0xffffff,0x8a7a60,0.75);scene.add(hemi);const sun=new THREE.DirectionalLight(0xffffff,0.8);sun.position.set(300,600,200);scene.add(sun);scene.add(new THREE.AmbientLight(0xffffff,0.15));
 const TAPPABLE=[];
+
+/* ===== 01-helpers.js ===== */
 const GB=new THREE.BoxGeometry(1,1,1),GS=new THREE.SphereGeometry(1,14,10),GC=new THREE.CylinderGeometry(1,1,1,12),MC={};
 function M(c,e){const k=c+'|'+(e||'');if(!MC[k])MC[k]=new THREE.MeshLambertMaterial({color:c,emissive:e||0x000000});return MC[k];}
 function B(w,h,d,c,x,y,z,p,e){const m=new THREE.Mesh(GB,typeof c==='string'?M(c,e):c);m.scale.set(w,h,d);m.position.set(x,y+h/2,z);(p||scene).add(m);return m;}
 function S(r,c,x,y,z,p,sx,sy,sz,e){const m=new THREE.Mesh(GS,M(c,e));m.scale.set(r*(sx||1),r*(sy||1),r*(sz||1));m.position.set(x,y,z);(p||scene).add(m);return m;}
 function C(r,h,c,x,y,z,p,e){const m=new THREE.Mesh(GC,M(c,e));m.scale.set(r,h,r);m.position.set(x,y+h/2,z);(p||scene).add(m);return m;}
-function grp(p,act){const g=new THREE.Group();(p||scene).add(g);if(act){g.userData.act=act;TAPPABLE.push(g);}return g;}const pet={root:null,parts:null,x:1,y:0,z:5,ang:Math.PI,path:[],act:'wander',timer:3,arrived:false,hidden:false,carry:false,happy:0,waveT:0,say:'',sayT:0,chatT:16,yo:0,look:null};
+function grp(p,act){const g=new THREE.Group();(p||scene).add(g);if(act){g.userData.act=act;TAPPABLE.push(g);}return g;}
+
+/* ===== 02-buddy.js ===== */
+const pet={root:null,parts:null,x:1,y:0,z:5,ang:Math.PI,path:[],act:'wander',timer:3,arrived:false,hidden:false,carry:false,happy:0,waveT:0,say:'',sayT:0,chatT:16,yo:0,look:null};
 function buildPet(){
  if(pet.root)scene.remove(pet.root);
  const cat=kind==='cat',cB=cat?'#f4b469':'#fbfaf5',cD=cat?'#d9893f':'#2c2c2c',cL=cat?'#fff3e2':'#ffffff',limbC=cat?cB:cD;
@@ -121,6 +126,9 @@ function setPose(pose,t,moving){
  P.tail.position.set(0,0.1,-0.28);P.tail.rotation.set(-1.3,0.5+Math.sin(t*2)*0.2,0);
  P.eyes.scale.y=blink?0.15:1;
 }
+
+
+/* ===== 03-city-core.js ===== */
 /* =================== BUDDY CITY: a real city generated from OpenStreetMap =================== */
 const O={lat:51.5007,lon:-0.1246,R:550,left:true,name:'',city:''};
 const KX=()=>111320*Math.cos(O.lat*Math.PI/180),KZ=110540;
@@ -617,6 +625,9 @@ function frame(now){requestAnimationFrame(frame);if(!last)last=now;const dt=Math
  renderer.render(scene,camera);}
 buildPet();updateSky();requestAnimationFrame(frame);
 
+
+/* ===== 10-discovery-layers.js ===== */
+
 /* ===================== BUDDY WORLD EXTRAS (open-source & open-data integrations) ===================== */
 Object.assign(LAY,{history:false,oldmaps:false,transit:false,news:false,hazards:false,radar:false,nature:true,research:false,radio:false,music:false,overture:false,street:false});
 const X2={};const XL={};const XM={};const artG=new THREE.Group();scene.add(artG);
@@ -843,6 +854,9 @@ const _updLayers=updateLayers;updateLayers=function(dt){_updLayers(dt);updX2();u
 (()=>{const qs=new URLSearchParams(location.search);if(qs.get('lat')&&qs.get('lon'))setTimeout(()=>{goTo('📍 '+(qs.get('n')||'Shared place'),+qs.get('lat'),+qs.get('lon'),qs.get('cc')||'');if(qs.get('room'))setTimeout(openFriends,4000);},300);})();
 addEventListener('keydown',e=>{if(e.code==='KeyB'&&!e.target.closest('input'))spawnBall();if(e.code==='KeyT'&&!e.target.closest('input'))openChat();});
 
+
+/* ===== 11-models-animals-physics.js ===== */
+
 /* ===================== EXTRAS 2: Quaternius + Kenney models, Poly Haven textures, Yuka AI, Rapier physics ===================== */
 const ASSET='assets/';let GL=null,MODELS={},modelsReady=false,TREE_LIST=[];const ANIMALS=[];let riding=null;let YUKA=null,yEM=null,RAP=null,rWorld=null,rBall=null;
 const PRETTY=(()=>{try{return localStorage.getItem('bw.pretty')!=='0';}catch(e){return true;}})();
@@ -931,6 +945,9 @@ const _layerUI2=layerUI;layerUI=function(){_layerUI2();const box=$('layList');[[
 addEventListener('keydown',e=>{if(e.code==='KeyH'&&!e.target.closest('input'))toggleRide();});
 window.BW_DEBUG=()=>({pl,ANIMALS,ball,toggleRide});
 
+
+/* ===== 12-public-records.js ===== */
+
 /* ===================== EXTRAS 3: public records about PLACES & EVENTS (never private people) ===================== */
 Object.assign(LAY,{cases:true,hygiene:false,heritage:false});
 const box3=()=>{const dLat=O.R*1.2/KZ,dLon=O.R*1.2/KX();return {s:O.lat-dLat,n:O.lat+dLat,w:O.lon-dLon,e:O.lon+dLon};};
@@ -1005,6 +1022,9 @@ const XLAY3=[['cases','🕵️ Real cases & events','Crimes, frauds, trials, dis
 const _layerUI3=layerUI;layerUI=function(){_layerUI3();const box=$('layList');const h=document.createElement('div');h.style.cssText='grid-column:1/-1;font-weight:bold;margin-top:6px';h.textContent='🔎 Public records (places & events only, never private people)';box.appendChild(h);
  XLAY3.forEach(r=>{const b=document.createElement('button');b.className=LAY[r[0]]?'on':'';b.innerHTML=r[1]+'<br><small>'+r[2]+'</small>';b.style.textAlign='left';b.onclick=()=>{LAY[r[0]]=!LAY[r[0]];b.className=LAY[r[0]]?'on':'';applyLayer(r[0]);};box.appendChild(b);});};
 const _apply3=applyLayer;applyLayer=function(k){_apply3(k);const on=LAY[k];if(k==='cases'&&on)loadCases();if(k==='hygiene'&&on)loadHygiene();if(k==='heritage'&&on)loadHeritage();};
+
+
+/* ===== 13-hidden-and-live-data.js ===== */
 
 /* ===================== EXTRAS 4: hidden data, live motion from maths, physics & chemistry, mixed "spot reports" ===================== */
 Object.assign(LAY,{plaques:false,films:false,ghost:false,wrecks:false,cams:false,bikes:false,river:false,roadworks:false,air:true,livebus:false,doppler:false,sat:false});
@@ -1149,6 +1169,9 @@ $('wx').style.cursor='pointer';$('wx').onclick=airCard;
 const _showInfo4=showInfo;showInfo=async function(b,poi){await _showInfo4(b,poi);const n=(poi&&poi.t.name)||(b&&(b.t.name||(b.pois&&b.pois[0]&&b.pois[0].t.name)))||'';const c=b?centroid(b.poly.outer):poi?poi.p:null;if(!c)return;
  const d=document.createElement('div');d.innerHTML='<div><button id="x4p">🏠 Sold prices</button> <button id="x4g">📜 Official notices</button> <button id="x4t">🕰️ Time portal</button> <button id="x4s">📍 Spot report</button></div>';$('iBody').appendChild(d);
  $('x4p').onclick=()=>b&&pricesCard(b);$('x4g').onclick=()=>gazetteCard(n||cityName());$('x4t').onclick=()=>portalCard(c[0],c[1],n);$('x4s').onclick=()=>spotReport(c[0],c[1],n);};
+
+
+/* ===== 14-science-lab.js ===== */
 
 /* ===================== EXTRAS 5: SCIENCE LAB — physics, chemistry, maths, biology, earth & space ===================== */
 Object.assign(LAY,{shadows:false,noise:false,plume:false,stars:true,clouds:true});
@@ -1313,6 +1336,9 @@ const _after5=afterCityLoaded;afterCityLoaded=function(){_after5();if(LAY.shadow
 const _showInfo5=showInfo;showInfo=async function(b,poi){await _showInfo5(b,poi);const c=b?centroid(b.poly.outer):poi?poi.p:null;if(!c)return;const n=(poi&&poi.t.name)||(b&&b.t.name)||'';const d=document.createElement('div');d.innerHTML='<div><button id="x5r">🧭 Route here</button>'+(b?' <button id="x5s">🔬 Science of this building</button>':'')+' <button id="x5f">🔥 Fire test</button></div>';$('iBody').appendChild(d);
  $('x5r').onclick=()=>routeTo(c[0],c[1],n);if(b)$('x5s').onclick=()=>sciCard(b);$('x5f').onclick=()=>{$('info').style.display='none';startFire(c[0],c[1],false);};};
 
+
+/* ===== 15-bus-bunching-lab.js ===== */
+
 /* ===================== EXTRAS 6: BUS BUNCHING LAB — live headway maths + holding optimiser ===================== */
 // Maths: passengers arriving at random wait on average AWT = Σh² / (2·Σh)  (the "inspection paradox":
 // you're more likely to turn up during a long gap). With perfectly even buses SWT = H/2.
@@ -1343,6 +1369,9 @@ async function bunchLab(){if(!isLondon()){card('🚌 Bus bunching lab','','<div>
 function updBunchFlags(){if(!BB.flag)return;for(const [k,v] of VEH){const on=BB.flag.has(k);if(v.flagged===on)continue;v.flagged=on;v.g.traverse(o=>{if(o.isMesh&&o.material&&o.material.emissive){if(on){o.material=o.material.clone();o.material.emissive.set('#ff0000');o.material.emissiveIntensity=0.6;}}});}}
 const _layerUI6=layerUI;layerUI=function(){_layerUI6();const box=$('layList');const b=document.createElement('button');b.innerHTML='🚌 Bus bunching lab<br><small>Live headway maths: who’s bunched, real waits, and the holding fix</small>';b.style.textAlign='left';b.onclick=()=>{$('layers').style.display='none';bunchLab();};box.appendChild(b);};
 const _upd6=updateLayers;updateLayers=function(dt){_upd6(dt);updBunchFlags();};
+
+
+/* ===== 16-vehicles-look-loading.js ===== */
 
 /* ===================== EXTRAS 7: realistic vehicles, nicer city look, smart loading & offline cache ===================== */
 
@@ -1421,6 +1450,9 @@ async function savedPlaces(){const ks=await IDB.keys();card('💾 Saved on this 
 const _upd7=updateLayers;updateLayers=function(dt){_upd7(dt);updLiveFx(dt);waterT.value+=dt;skyDome.position.copy(camera.position);};
 const _layerUI7=layerUI;layerUI=function(){_layerUI7();const box=$('layList');const b=document.createElement('button');b.innerHTML='💾 Saved places<br><small>Maps stored on this device for instant, offline-friendly loading</small>';b.style.textAlign='left';b.onclick=()=>{$('layers').style.display='none';savedPlaces();};box.appendChild(b);};
 window.BW_DEBUG2=()=>({movers,pl});
+
+
+/* ===== 17-navigation.js ===== */
 
 /* ===================== EXTRAS 8: route numbers & next stops, follow-cam, easy navigation, smart taps, minimap, journey planner, help nearby ===================== */
 
@@ -1515,6 +1547,9 @@ const _upd8=updateLayers;updateLayers=function(dt){_upd8(dt);updBusTags();stepFl
 const _reset8=resetLayers;resetLayers=function(){_reset8();mmBase=null;stopFollow();FLY=null;if(jMesh){world.remove(jMesh);jMesh=null;}};
 const _after8=afterCityLoaded;afterCityLoaded=function(){_after8();mmBase=null;if(isLondon()&&!LAY.livebus){LAY.livebus=true;applyLayer('livebus');}};
 
+
+/* ===== 18-graphics-sound-space.js ===== */
+
 /* ===================== EXTRAS 9: graphics quality (up to Ultra), city soundscape, space & sky data, on-this-day, postcodes ===================== */
 
 /* ---------- 1. Graphics quality: Low / High / Ultra (bloom glow, SMAA edges, sharp textures, 4K shadows, filmic colour) ---------- */
@@ -1577,6 +1612,9 @@ const _upd9=updateLayers;updateLayers=function(dt){_upd9(dt);updGQ();updSound(dt
 const _showInfo9=showInfo;showInfo=async function(b,poi){await _showInfo9(b,poi);if(b&&O.cc==='gb'){const d=document.createElement('div');d.innerHTML='<button id="x9p">📮 Council, ward & MP area</button>';$('iBody').appendChild(d);$('x9p').onclick=()=>postcodeCard(b);}};
 const _after9=afterCityLoaded;afterCityLoaded=function(){_after9();if(GQ!=='high')applyGQ(GQ);else anisotropy();};
 const _sky9=updateSky;updateSky=function(){_sky9();if(GQ==='ultra'){sun.intensity*=0.78;hemi.intensity*=0.82;}};
+
+
+/* ===== 19-labels-and-layout.js ===== */
 
 /* ===================== EXTRAS 10: street names on the roads, shop signs on the buildings, label de-cluttering, phone-first clean layout, live Nearby panel ===================== */
 
@@ -1669,6 +1707,9 @@ const _after10=afterCityLoaded;afterCityLoaded=function(){_after10();setTimeout(
 const _reset10=resetLayers;resetLayers=function(){_reset10();if(streetG){world.remove(streetG);streetG=null;}if(shopG){world.remove(shopG);shopG=null;}SIGNED.clear();};
 const _upd10=updateLayers;updateLayers=function(dt){_upd10(dt);updStreetNames();updShopSigns();updNearby(dt);declutter(dt);};
 
+
+/* ===== 20-photoreal-and-ui.js ===== */
+
 /* ===================== EXTRAS 11: photo-real roofs & ground from satellite, real wall materials, seasons, wet roads, street photos while walking, logo & UI polish ===================== */
 
 /* ---------- 1. Satellite photo draped on every roof and on the ground ---------- */
@@ -1730,6 +1771,9 @@ const _after11=afterCityLoaded;afterCityLoaded=function(){_after11();setTimeout(
 const _reset11=resetLayers;resetLayers=function(){_reset11();SAT.on.value=0;SAT.tex=null;SAT.lat=null;if(photoMesh){world.remove(photoMesh);photoMesh=null;}pipLast=null;};
 let pipT=0;const _upd11=updateLayers;updateLayers=function(dt){_upd11(dt);updWet(dt);pipT-=dt;if(pipT<=0){pipT=1;updPip();}};
 
+
+/* ===== 21-search.js ===== */
+
 /* ===================== EXTRAS 12: better place search (postcodes, clear area names), robust map download, auto-fill missing buildings ===================== */
 const PC_RE=/^\s*([A-Z]{1,2}\d[A-Z\d]?)\s*(\d[A-Z]{2})\s*$/i;
 search=async function(q,box){box.innerHTML='<i>Searching…</i>';const list=[];
@@ -1742,6 +1786,9 @@ search=async function(q,box){box.innerHTML='<i>Searching…</i>';const list=[];
 // fill gaps automatically when OpenStreetMap has few buildings mapped here
 const _after12=afterCityLoaded;afterCityLoaded=function(){_after12();if(!CITY)return;const nb=CITY.buildings.filter(b=>!b.outlineOnly).length,km2=(2*O.R/1000)**2,dens=nb/km2;
  if(dens<450&&!LAY.overture){LAY.overture=true;applyLayer('overture');showHint('🏗️ OpenStreetMap only has '+nb+' buildings mapped here, so I’m adding missing houses from Overture Maps (open building footprints).',7);}};
+
+
+/* ===== 22-startup-opportunities.js ===== */
 
 /* ===================== EXTRAS 13: open where you left off (or where you are), always-live transport & cameras, remembered layers, opportunities nearby ===================== */
 
@@ -1799,6 +1846,44 @@ const _layerUI13=layerUI;layerUI=function(){_layerUI13();const box=$('layList');
 const _apply13b=applyLayer;applyLayer=function(k){_apply13b(k);if(k==='opps'&&LAY.opps)loadOpps();};
 {const b=document.createElement('button');b.textContent='💼';b.title='Opportunities near here';b.style.cssText='width:44px;height:44px;border-radius:50%;font-size:20px;padding:0';b.onclick=oppsCard;QB.appendChild(b);}
 const _upd13=updateLayers;updateLayers=function(dt){_upd13(dt);saveView(dt);};
+
+
+/* ===== 30-plugin-api.js ===== */
+
+/* ===================== 30 · PLUGIN API: lets anyone add layers, buttons and data without editing the core =====================
+   Docs: PLUGINS.md · Examples: plugins/*.js · Register a plugin by adding its file name to plugins/index.json            */
+const PLUG={list:[],tick:[],city:[],reset:[]};
+const BW=window.BuddyWorld={
+ version:'1.0.0',THREE,scene,world,camera,renderer,
+ get place(){return {name:O.name,city:cityName(),lat:O.lat,lon:O.lon,radius:O.R,country:O.cc,isLondon:isLondon()};},
+ get time(){return {hour:cityHour(),sun:solar(),weather:WX,air:AQ,wind:WIND};},
+ get buddy(){return {x:pet.x,z:pet.z,lat:toLL(pet.x,pet.z)[0],lon:toLL(pet.x,pet.z)[1]};},
+ get city(){return CITY?{buildings:CITY.buildings,pois:CITY.pois,roads:CITY.roads,buildingAt:CITY.buildingAt}:null;},
+ toLocal:(lat,lon)=>{const p=toL(lat,lon);return {x:p[0],z:p[1]};},toLatLon:(x,z)=>{const l=toLL(x,z);return {lat:l[0],lon:l[1]};},
+ getJSON:jget,overpass:q=>ovp(q.replace('{{bbox}}',bbS())),bbox:()=>{const b=box3();return {south:b.s,west:b.w,north:b.n,east:b.e,overpass:bbS()};},
+ pin(layerId,{lat,lon,x,z,emoji='📍',label='',height,color,onTap}){if(lat!=null){const p=toL(lat,lon);x=p[0];z=p[1];}return xpin(layerId,x,z,emoji,String(label).slice(0,60),onTap||(()=>{}),{h:height,pole:color});},
+ clearPins:layerId=>clearKey(layerId),
+ card:({title='',html='',image,link,linkText})=>card(title,image?'<img src="'+esc(image)+'" alt="">':'',html,link?'<a target="_blank" rel="noopener" href="'+esc(link)+'">'+esc(linkText||'Open')+'</a>':''),
+ hint:(t,s)=>showHint(t,s||4),say:(t,s)=>say(t,s||4),escape:esc,
+ flyTo:(lat,lon,zoom)=>{const p=toL(lat,lon);flyTo(p[0],p[1],zoom||150);},walkTo:(lat,lon,name)=>{const p=toL(lat,lon);routeTo(p[0],p[1],name);},
+ onTick:fn=>PLUG.tick.push(fn),onCityLoaded:fn=>PLUG.city.push(fn),onReset:fn=>PLUG.reset.push(fn),
+ addLayer(def){/* {id,name,emoji,description,load(),unload(),defaultOn} */if(!def||!def.id)throw new Error('addLayer needs an id');def.id='pl_'+def.id.replace(/[^\w-]/g,'');if(!(def.id in LAY))LAY[def.id]=!!def.defaultOn;PLUG.list.push(Object.assign({kind:'layer'},def));return def.id;},
+ addButton(def){/* {name,emoji,description,onClick()} */PLUG.list.push(Object.assign({kind:'button'},def));},
+ isOn:id=>!!LAY['pl_'+id]};
+function plugRun(fn,...a){try{return fn(...a);}catch(e){console.warn('[Buddy plugin]',e);showHint('🧩 A plugin had a problem: '+e.message,4);}}
+const _apply30=applyLayer;applyLayer=function(k){_apply30(k);const d=PLUG.list.find(p=>p.id===k);if(!d)return;if(LAY[k]){if(!d.loaded||d.reloadEachTime){d.loaded=true;Promise.resolve(plugRun(()=>d.load&&d.load())).catch(e=>showHint('🧩 '+d.name+': '+e.message,4));}}else{clearKey(k);plugRun(()=>d.unload&&d.unload());}};
+const _layerUI30=layerUI;layerUI=function(){_layerUI30();const box=$('layList');const h=document.createElement('div');h.style.cssText='grid-column:1/-1;font-weight:bold;margin-top:6px';h.textContent='🧩 Community plugins';box.appendChild(h);
+ PLUG.list.forEach(d=>{const b=document.createElement('button');b.style.textAlign='left';b.innerHTML=(d.emoji||'🧩')+' '+esc(d.name||d.id)+'<br><small>'+esc(d.description||'')+(d.author?' · by '+esc(d.author):'')+'</small>';
+  if(d.kind==='layer'){b.className=LAY[d.id]?'on':'';b.onclick=()=>{LAY[d.id]=!LAY[d.id];b.className=LAY[d.id]?'on':'';applyLayer(d.id);};}else b.onclick=()=>{$('layers').style.display='none';plugRun(()=>d.onClick&&d.onClick());};box.appendChild(b);});
+ const dev=document.createElement('button');dev.style.textAlign='left';dev.innerHTML='🛠️ Try a plugin from a link<br><small>For developers: test your plugin before sending a pull request</small>';dev.onclick=()=>{$('layers').style.display='none';devPluginCard();};box.appendChild(dev);};
+function devPluginCard(){card('🛠️ Try a plugin','','<div>Paste the link to a plugin <b>.js</b> file (for example a raw GitHub link). It runs inside Buddy World with full access to this page, so <b>only load code you trust</b>. It is not saved: reload to remove it.</div><div style="display:flex;gap:4px;margin-top:6px"><input id="dpU" placeholder="https://…/my-plugin.js" style="flex:1;min-width:0"><button id="dpGo" style="width:auto;height:auto;padding:6px 10px">Load</button></div><div id="dpO"></div>','<a target="_blank" rel="noopener" href="https://github.com/hammadcheema1222-jpg/buddy-world/blob/main/PLUGINS.md">How to write a plugin</a>');
+ $('dpU').onkeydown=e=>e.stopPropagation();$('dpU').onkeyup=e=>e.stopPropagation();$('dpGo').onclick=async()=>{const u=$('dpU').value.trim();if(!/^https:\/\//.test(u)){$('dpO').textContent='Use an https:// link.';return;}try{const n=PLUG.list.length;await loadScript(u);$('dpO').innerHTML='✅ Loaded. '+(PLUG.list.length-n)+' new item(s) in Layers → 🧩 Community plugins.';}catch(e){$('dpO').textContent='Could not load that file.';}};}
+async function loadPlugins(){try{const r=await fetch('plugins/index.json',{cache:'no-cache'});if(!r.ok)return;const j=await r.json();for(const f of (j.plugins||[])){if(!/^[\w-]+\.js$/.test(f))continue;try{await loadScript('plugins/'+f);}catch(e){console.warn('plugin failed',f);}}}catch(e){}
+ PLUG.list.forEach(d=>{if(d.kind==='layer'&&LAY[d.id]&&CITY)applyLayer(d.id);});}
+loadPlugins();
+const _after30=afterCityLoaded;afterCityLoaded=function(){PLUG.list.forEach(d=>{d.loaded=false;});_after30();PLUG.city.forEach(fn=>plugRun(fn,BW.place));};
+const _reset30=resetLayers;resetLayers=function(){_reset30();PLUG.reset.forEach(fn=>plugRun(fn));};
+const _upd30=updateLayers;updateLayers=function(dt){_upd30(dt);for(const fn of PLUG.tick)plugRun(fn,dt);};
 
 }
 </script></body></html>

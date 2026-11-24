@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Buddy City — real cities built from OpenStreetMap</title>
+<style>
+html,body{margin:0;height:100%;background:#9fc9e6;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;font-family:Georgia,'Times New Roman',serif;color:#3d2c17}
+canvas#c{position:fixed;top:0;left:0;width:100%;height:100%;display:block}
+.paper{background:rgba(244,234,213,.95);border:2px solid #6b4f2e;border-radius:12px;box-shadow:0 3px 0 #6b4f2e}
+button,select{font:inherit;font-size:14px;background:#fbf5e6;border:1.5px solid #8a6a40;border-radius:8px;padding:6px 9px;color:#3d2c17;min-height:36px;cursor:pointer}
+button:hover{background:#f3e8cf}button.on{background:#e9dcbc;box-shadow:inset 0 0 0 2px #6b4f2e}
+input[type=text]{font:inherit;font-size:16px;padding:7px 10px;border:1.5px solid #8a6a40;border-radius:8px;background:#fffdf7;min-width:0;flex:1}
+#top{position:fixed;right:8px;top:8px;display:flex;flex-wrap:wrap;gap:5px;padding:5px 6px;justify-content:flex-end;max-width:62vw;z-index:2}
+#hud{position:fixed;left:8px;top:8px;padding:6px 12px;max-width:36vw;z-index:2}
+#place{font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#coords,#clock{font-size:12px;opacity:.8}
+#timebar{position:fixed;left:50%;bottom:8px;transform:translateX(-50%);display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:14px;z-index:2;flex-wrap:wrap;justify-content:center;max-width:96vw}
+#timebar input[type=range]{width:150px}#yrL{min-width:44px;display:inline-block;font-weight:bold}
+#bubble{position:fixed;left:0;top:0;padding:7px 12px;font-size:17px;pointer-events:none;display:none;white-space:nowrap;border-radius:12px;z-index:3}
+#bubble:after{content:'';position:absolute;left:50%;bottom:-9px;margin-left:-7px;border:7px solid transparent;border-top-color:#6b4f2e;border-bottom:0}
+.fx{position:fixed;pointer-events:none;font-size:24px;transition:transform 1.4s ease-out,opacity 1.4s ease-out;z-index:5}
+#hint,#status{position:fixed;left:50%;transform:translateX(-50%);padding:6px 12px;font-size:14px;display:none;white-space:nowrap;max-width:94vw;overflow:hidden;text-overflow:ellipsis;z-index:4}
+#hint{top:64px}#status{top:45%;font-size:18px;padding:12px 18px}
+#joy{position:fixed;left:24px;bottom:70px;width:130px;height:130px;border-radius:50%;background:rgba(251,245,230,.4);border:2px solid rgba(107,79,46,.6);display:none;z-index:2}
+#knob{position:absolute;left:40px;top:40px;width:50px;height:50px;border-radius:50%;background:rgba(251,245,230,.92);border:2px solid #6b4f2e}
+#updn{position:fixed;right:16px;bottom:80px;display:none;flex-direction:column;gap:8px;z-index:2}#updn button{width:60px;height:60px;font-size:22px}
+#attr{position:fixed;right:6px;bottom:2px;font-size:10px;background:rgba(255,255,255,.75);padding:1px 6px;border-radius:6px;z-index:1}
+.over{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(20,14,8,.5);z-index:10}
+.card{padding:18px 22px;max-width:min(880px,94vw);max-height:90vh;overflow:auto}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px;margin:8px 0}
+.row{display:flex;gap:8px;margin:8px 0;align-items:center}.res{display:flex;flex-direction:column;gap:5px}.res button{text-align:left}
+h1{font-size:26px;margin:0 0 4px}h3{margin:12px 0 2px;font-size:17px}p{margin:4px 0}small{opacity:.8}
+#info .card{max-width:min(560px,94vw)}#iBody div{margin:3px 0;font-size:15px}#iBody b{display:inline-block;min-width:110px;color:#6b4f2e}
+#iImg img{width:100%;max-height:300px;object-fit:cover;border-radius:10px;border:2px solid #6b4f2e;margin:8px 0}#iWiki{font-size:14px;line-height:1.5;margin-top:6px}
+</style></head><body>
+<canvas id="c"></canvas>
+<div id="hud" class="paper"><div id="place">🏙️ Buddy City</div><div id="clock"></div><div id="wx" style="font-size:12px"></div><div id="coords"></div></div>
+<div id="top" class="paper"><button id="bPlaces">🔍 Places</button><button id="bLayers">🧭 Layers</button><button id="mWalk">🚶 Walk</button><button id="mFly">✈️ Fly</button><button id="mMap" class="on">🗺️ Overview</button><button id="bKind">🐼 Panda</button><button id="bFs">⛶</button></div>
+<div id="timebar" class="paper"><span>☀️ Time</span><input type="range" id="tSlider" min="0" max="23.9" step="0.1" value="12"><button id="tLive" class="on">Live</button><span style="margin-left:10px">🏛️ History</span><input type="range" id="yr" min="1800" max="2026" step="1" value="2026"><span id="yrL">Now</span><button id="yPlay">▶</button></div>
+<div id="bubble" class="paper"></div><div id="hint" class="paper"></div><div id="status" class="paper"></div>
+<div id="joy"><div id="knob"></div></div><div id="updn"><button id="bUp" class="paper">⬆</button><button id="bDn" class="paper">⬇</button></div>
+<div id="attr">Map data © OpenStreetMap contributors (ODbL) · Photos & text: Wikipedia / Wikimedia Commons / Wikidata · Flights: adsb.lol / airplanes.live / OpenSky · Satellites: CelesTrak · Weather: Open-Meteo · UK incidents: data.police.uk (OGL)</div>
+<div id="start" class="over"><div class="card paper">
+<h1>🏙️ Buddy City</h1>
+<p>Pick any place on Earth and Buddy City builds it in 3D from real OpenStreetMap data: every building with its real height and roof, the streets, pavements, crossings, rivers, parks, trees, lamps, benches and bus stops. Then it brings the city to life with traffic, people, boats, day and night, and a history slider.</p>
+<div class="row"><b>Area size</b><select id="size"><option value="350">Small (≈700 m across, fastest)</option><option value="550" selected>Medium (≈1.1 km across)</option><option value="800">Large (≈1.6 km across, slower)</option></select></div>
+<h3>Start somewhere real</h3><div class="grid" id="pre1"></div>
+<h3>Or anywhere</h3><div class="row"><input type="text" id="q1" placeholder="Type any place: a street, a town, a landmark…"><button id="s1">Search</button></div><div class="res" id="r1"></div>
+<p><small>Keys: WASD / arrows · drag to look · Shift = faster · F = fly · M = overview. Click buildings and name signs to see real info and photos. Needs internet.</small></p>
+</div></div>
+<div id="places" class="over" style="display:none"><div class="card paper"><h1>🔍 Where next?</h1><div class="grid" id="pre2"></div>
+<div class="row"><input type="text" id="q2" placeholder="Search anywhere on Earth…"><button id="s2">Search</button></div><div class="res" id="r2"></div><div class="row"><button id="pClose">Close</button></div></div></div>
+<div id="info" class="over" style="display:none"><div class="card paper"><h1 id="iTitle"></h1><div id="iImg"></div><div id="iBody"></div><div id="iWiki"></div><div class="row"><button id="iInside">🏢 Look inside</button><button id="iClose">Close</button></div></div></div>
+<div id="layers" class="over" style="display:none"><div class="card paper"><h1>🧭 Discovery layers</h1><p>Real data from all over the internet, placed on the map.</p><div class="grid" id="layList"></div><div class="row"><button id="lClose">Close</button></div></div></div>
+<div id="insideBar" class="paper" style="position:fixed;left:50%;top:112px;transform:translateX(-50%);display:none;gap:10px;align-items:center;padding:6px 12px;z-index:3">🏢 <input type="range" id="floor" min="1" max="5" value="5" style="width:180px"><span id="floorL"></span><button id="exitIn">Exit inside view</button></div>
+<div id="err" class="over" style="display:none"><div class="card paper"><h1>😿 Hmm…</h1><p id="errT"></p><div class="row"><button id="eClose">OK</button></div></div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+{
+'use strict';
+const $=id=>document.getElementById(id);
+if(!window.THREE){document.body.innerHTML='<p style="padding:30px">Could not load the 3D engine — check the internet connection.</p>';throw new Error('no three');}
+const sget=k=>{try{return localStorage.getItem(k);}catch(e){return null;}};const sset=(k,v)=>{try{localStorage.setItem(k,v);}catch(e){}};
+let kind=sget('bh.kind')||'cat';const pickR=a=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const cv=$('c');const renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true,logarithmicDepthBuffer:true});renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.5));
+const scene=new THREE.Scene();scene.fog=new THREE.Fog(0x9fc9e6,600,1800);const camera=new THREE.PerspectiveCamera(60,1,0.3,4000);
+function resize(){renderer.setSize(innerWidth,innerHeight,false);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();}addEventListener('resize',resize);resize();
+const hemi=new THREE.HemisphereLight(0xffffff,0x8a7a60,0.75);scene.add(hemi);const sun=new THREE.DirectionalLight(0xffffff,0.8);sun.position.set(300,600,200);scene.add(sun);scene.add(new THREE.AmbientLight(0xffffff,0.15));
+const TAPPABLE=[];

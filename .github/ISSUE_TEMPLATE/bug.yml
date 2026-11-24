@@ -1,0 +1,12 @@
+name: 🐞 Bug
+description: Something is broken or looks wrong
+labels: [bug]
+body:
+  - type: input
+    attributes: {label: Where?, description: "Place name and which app (City / Earth Live / Earth)"}
+    validations: {required: true}
+  - type: textarea
+    attributes: {label: What happened?, description: "And what you expected. Screenshots help a lot."}
+    validations: {required: true}
+  - type: dropdown
+    attributes: {label: Device, options: ["Phone (iPhone)", "Phone (Android)", "Laptop / desktop", "Tablet"]}

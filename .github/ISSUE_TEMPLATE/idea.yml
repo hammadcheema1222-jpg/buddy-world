@@ -1,0 +1,13 @@
+name: ✨ Idea or new feature
+description: Suggest something new
+labels: [idea]
+body:
+  - type: textarea
+    attributes: {label: Your idea, description: "What should Buddy World do?"}
+    validations: {required: true}
+  - type: input
+    attributes: {label: Data source (if any), description: "A link to the open data or API"}
+  - type: checkboxes
+    attributes:
+      label: Could it be a plugin?
+      options: [{label: "I might build it myself as a plugin (see PLUGINS.md)"}]

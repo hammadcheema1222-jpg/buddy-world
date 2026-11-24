@@ -1,0 +1,13 @@
+name: 🗂️ New data source
+description: Suggest open data to add
+labels: [data]
+body:
+  - type: input
+    attributes: {label: Name and link}
+    validations: {required: true}
+  - type: input
+    attributes: {label: Licence, description: "e.g. ODbL, OGL, CC-BY, CC0"}
+  - type: dropdown
+    attributes: {label: Needs a key?, options: ["No", "Free key", "Paid", "Don't know"]}
+  - type: textarea
+    attributes: {label: What would it show on the map?}

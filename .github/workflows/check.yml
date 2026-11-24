@@ -1,0 +1,19 @@
+name: Check
+on:
+  pull_request:
+  push:
+    branches: [main]
+    paths: ['src/**', 'plugins/**', 'build.mjs']
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 20}
+      - name: Syntax check of the app and every plugin
+        run: node build.mjs --check
+      - name: city.html is up to date with src/city
+        run: |
+          node build.mjs
+          git diff --exit-code city.html || (echo "::error::city.html is out of date. Run: node build.mjs and commit the result." && exit 1)
