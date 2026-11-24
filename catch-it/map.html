@@ -10,18 +10,17 @@
 <link href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;600;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.1/dist/maplibre-gl.css">
 <style>
-/* VOICE: the city as a moving model, quiet until you ask
-   IDEA: a transport control room: every real vehicle gliding on its real road and track
-   PICTURE: the full-screen live map, tilting into 3D, riding along at window height
-   COLOUR+TYPE: official line colours on a pale map, Overpass numerals
-   LAYOUT: top bar, map fills the screen, one side panel (bottom sheet on phones) */
-:root{color-scheme:light dark;--bg:light-dark(#ffffff,#0f1122);--panel:light-dark(#f3f4f8,#181b33);--ink:light-dark(#14162b,#eef0fb);--muted:light-dark(#5d6275,#a3a8c3);--line:light-dark(#dfe2ec,#2a2e4d);--go:light-dark(#0c7a52,#3dd39a);--risk:light-dark(#a05d00,#f2b33d)}
+/* VOICE: the real city, live, calm until you ride
+   IDEA: a model railway of your own town: real satellite ground, real hills, real buses and trains moving
+   PICTURE: the full-screen map; in 3D world you sit at a real train's window
+   COLOUR+TYPE: satellite ground, official line colours, Overpass numerals
+   LAYOUT: top bar, map fills the screen, one compact panel (bottom sheet on phones) */
+:root{color-scheme:light dark;--bg:light-dark(#ffffff,#0f1122);--panel:light-dark(#f3f4f8,#181b33);--ink:light-dark(#14162b,#eef0fb);--muted:light-dark(#5d6275,#a3a8c3);--line:light-dark(#dfe2ec,#2a2e4d);--go:light-dark(#0c7a52,#3dd39a)}
 :root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
 *{box-sizing:border-box;min-width:0}
 html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Overpass,system-ui,sans-serif;overflow:hidden;font-variant-numeric:tabular-nums}
-button,select,input{font:inherit;color:inherit}
-button,select{min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--bg);padding:0 12px;font-weight:600;cursor:pointer}
+button,select{font:inherit;color:inherit;min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--bg);padding:0 12px;font-weight:600;cursor:pointer}
 button:focus-visible,select:focus-visible{outline:3px solid #6950a1;outline-offset:2px}
 .top{display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--line);background:var(--bg);height:62px}
 .logo{font-weight:800;font-size:20px;display:flex;align-items:center;gap:8px;text-decoration:none;color:inherit}
@@ -31,78 +30,81 @@ nav{display:flex;gap:4px;margin-left:auto}
 nav a{padding:10px 12px;border-radius:10px;color:var(--ink);text-decoration:none;font-weight:600}
 nav a[aria-current]{background:var(--ink);color:var(--bg)}
 #map{position:absolute;top:62px;left:0;right:0;bottom:0}
-.panel{position:absolute;top:74px;left:12px;width:min(360px,calc(100% - 24px));max-height:calc(100% - 90px);overflow:auto;background:var(--bg);border:1px solid var(--line);border-radius:16px;padding:14px;box-shadow:0 8px 30px rgba(0,0,0,.15);z-index:3}
-.panel h2{margin:0 0 4px;font-size:18px}
+.panel{position:absolute;top:74px;left:12px;width:min(350px,calc(100% - 24px));max-height:calc(100% - 90px);overflow:auto;background:var(--bg);border:1px solid var(--line);border-radius:16px;padding:12px 14px;box-shadow:0 8px 30px rgba(0,0,0,.18);z-index:3}
+.panel h2{margin:0;font-size:18px}
 .panel h3{margin:14px 0 6px;font-size:15px}
 .note{font-size:13px;color:var(--muted)}
-.lines{display:flex;flex-wrap:wrap;gap:6px}
-.lines label{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:99px;padding:4px 10px 4px 6px;font-size:14px;font-weight:600;cursor:pointer}
-.lines label i{width:14px;height:14px;border-radius:4px;display:inline-block}
-.lines input{accent-color:#6950a1}
-.btns{display:flex;gap:6px;flex-wrap:wrap}
-.btns button[aria-pressed=true]{background:var(--ink);color:var(--bg)}
-select{width:100%;margin:4px 0}
-.vm{padding:2px 6px;border-radius:6px;color:#fff;font:800 11px Overpass,sans-serif;box-shadow:0 1px 4px rgba(0,0,0,.35);border:2px solid #fff;white-space:nowrap;cursor:pointer;transition:opacity .4s}
-.vm.rail{padding:3px 8px;border-radius:9px}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-top:10px}
+.seg button{border:0;border-radius:0;min-height:46px}
+.seg button[aria-pressed=true]{background:var(--ink);color:var(--bg)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}
+.row2 button[aria-pressed=true]{background:var(--ink);color:var(--bg)}
+select{width:100%;margin-top:6px}
+.main{background:#6950a1;color:#fff;border-color:#6950a1}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips label{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:99px;padding:4px 10px 4px 6px;font-size:14px;font-weight:600;cursor:pointer}
+.chips label i{width:14px;height:14px;border-radius:4px;display:inline-block}
+.chips input{accent-color:#6950a1}
+details summary{cursor:pointer;font-weight:600;font-size:14px;margin:8px 0}
+.sidebox{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.side{border:1px solid var(--line);border-radius:12px;padding:8px 10px}.side b{display:block;font-size:20px}.side.win{border:2px solid var(--go)}
+.hud{position:absolute;left:50%;top:76px;transform:translateX(-50%);background:rgba(15,17,34,.86);color:#fff;border-radius:14px;padding:8px 10px 8px 14px;z-index:4;display:none;gap:8px;align-items:center;font-weight:600;max-width:calc(100% - 24px);flex-wrap:wrap;justify-content:center}
+.hud.on{display:flex}.hud button{background:transparent;color:#fff;border-color:rgba(255,255,255,.4);min-height:38px;padding:0 10px}
+.hud button[aria-pressed=true]{background:#fff;color:#14162b}
+.panel.riding{display:none}
+.frame{position:absolute;top:62px;left:0;right:0;bottom:0;pointer-events:none;z-index:2;display:none;box-shadow:inset 0 0 0 14px rgba(30,32,48,.9),inset 0 0 60px 30px rgba(0,0,0,.35);border-radius:0}
+.frame.on{display:block}
 .me{width:16px;height:16px;border-radius:50%;background:#2f6fde;border:3px solid #fff;box-shadow:0 0 0 2px #2f6fde}
-.sidebox{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
-.side{border:1px solid var(--line);border-radius:12px;padding:10px}
-.side b{display:block;font-size:22px}
-.side.win{border:2px solid var(--go)}
-.hud{position:absolute;left:50%;bottom:24px;transform:translateX(-50%);background:rgba(20,22,43,.88);color:#fff;border-radius:14px;padding:10px 14px;z-index:4;display:none;gap:10px;align-items:center;font-weight:600}
-.hud.on{display:flex}.hud button{background:transparent;color:#fff;border-color:rgba(255,255,255,.4);min-height:38px}
-.toggleP{display:none}
-.panel.flying{display:none}
-@media(max-width:700px){.panel{top:auto;bottom:0;left:0;width:100%;max-height:46%;border-radius:16px 16px 0 0}.panel.min{max-height:64px;overflow:hidden}.toggleP{display:inline-block;float:right}nav a{padding:8px}.logo span{display:none}}
-@media(prefers-reduced-motion:reduce){.vm{transition:none}}
+.grab{display:none}
+@media(max-width:700px){.panel{top:auto;bottom:0;left:0;width:100%;max-height:52%;border-radius:16px 16px 0 0}.panel.min{max-height:118px;overflow:hidden}.grab{display:block;width:100%;min-height:24px;border:0;background:none;padding:0}.grab::before{content:"";display:block;width:44px;height:5px;border-radius:3px;background:var(--line);margin:0 auto}nav a{padding:8px}.logo span{display:none}}
 </style>
 </head>
 <body>
 <div class="top"><a class="logo" href="./"><i></i><span>Catch It</span></a>
 <nav><a href="./">Board</a><a href="map.html" aria-current="page">Map</a><a href="station.html">Station</a></nav></div>
 <div id="map"></div>
-<aside class="panel" id="panel">
-  <button class="toggleP" id="minBtn">Hide</button>
+<aside class="panel min" id="panel">
+  <button class="grab" id="grab" aria-label="Show or hide the panel"></button>
   <h2>Live map</h2>
   <p class="note" id="status">Loading your lines…</p>
-  <h3>Lines on the map</h3>
-  <div class="lines" id="lines"></div>
-  <h3>View</h3>
-  <div class="btns"><button id="b3d" aria-pressed="false">3D buildings</button><button id="bFit">Show my stops</button></div>
-  <p class="note">3D buildings are lit by the real sun position for now.</p>
-  <h3>Window view and seat advisor</h3>
+  <div class="seg" role="group" aria-label="View"><button data-v="map">Map</button><button data-v="sat">Satellite</button><button data-v="3d">3D world</button></div>
+  <h3>Ride a real train or bus</h3>
   <select id="route" aria-label="Line and direction"></select>
-  <select id="pref" aria-label="Sun preference"><option value="avoid">Avoid sun in my eyes</option><option value="like">I like the sun</option></select>
-  <div id="seat" class="note">Pick a line to see which side to sit on.</div>
-  <div class="btns" style="margin-top:8px"><button id="flyL">Ride: left window</button><button id="flyR">Ride: right window</button></div>
-  <p class="note" style="margin-top:12px">Data: Powered by TfL Open Data. Map © <a href="https://openfreemap.org">OpenFreeMap</a>, © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors. Scenery from OpenStreetMap via Overpass.</p>
+  <div class="row2"><button class="main" id="ride">Ride the next one (live)</button><button id="preview">Fast preview</button></div>
+  <div id="seat" class="note" style="margin-top:8px">Pick a line to see which side to sit on.</div>
+  <select id="pref" aria-label="Sun preference"><option value="avoid">I'd rather avoid the sun</option><option value="like">I like the sun</option></select>
+  <h3>Lines on the map</h3>
+  <div class="chips" id="rail"></div>
+  <details id="busBox"><summary id="busSum">Buses at your stops</summary><div class="chips" id="bus"></div></details>
+  <p class="note" style="margin-top:12px">Powered by TfL Open Data. Imagery © Esri, Maxar, Earthstar Geographics. Terrain: AWS Terrain Tiles (Mapzen). Map © OpenFreeMap, © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors.</p>
 </aside>
-<div class="hud" id="hud"><span id="hudTxt">Riding…</span><button id="hudStop">Stop</button></div>
+<div class="frame" id="frame"></div>
+<div class="hud" id="hud"><span id="hudTxt">Riding…</span><button data-look="C">Outside</button><button data-look="L">Left</button><button data-look="F">Front</button><button data-look="R">Right</button><button id="hudStop">Stop</button></div>
 
 <script src="https://unpkg.com/maplibre-gl@5.24.1/dist/maplibre-gl.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 {
 const TFL = 'https://api.tfl.gov.uk';
-const LINE_COL = {elizabeth:'#6950a1',central:'#dc241f',jubilee:'#7b868c',district:'#00782a','hammersmith-city':'#f589a6',circle:'#d4a900',metropolitan:'#9b0058',northern:'#1c1c1c',piccadilly:'#0019a8',victoria:'#0098d4',bakerloo:'#b36305','waterloo-city':'#4bb5a7',dlr:'#00a4a7',liberty:'#5d6061',lioness:'#faa61a',mildmay:'#006fe6',suffragette:'#18a95d',weaver:'#9b0058',windrush:'#dc241f',tram:'#5fb526'};
-const RAILISH = ['elizabeth-line','tube','overground','dlr','tram'];
+const LINE_COL = {elizabeth:'#6950a1',central:'#dc241f',jubilee:'#7b868c',district:'#00782a','hammersmith-city':'#f589a6',circle:'#d4a900',metropolitan:'#9b0058',northern:'#1c1c1c',piccadilly:'#0019a8',victoria:'#0098d4',bakerloo:'#b36305','waterloo-city':'#4bb5a7',dlr:'#00a4a7',liberty:'#61686b',lioness:'#faa61a',mildmay:'#006fe6',suffragette:'#18a95d',weaver:'#9b0058',windrush:'#dc241f',tram:'#5fb526'};
 const $ = s => document.querySelector(s);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let cfg = {places: [], mapLines: null};
+let cfg = {places: [], mapLines: null, view: '3d'};
 try { cfg = Object.assign(cfg, JSON.parse(localStorage.getItem('catchit.v1') || '{}')); } catch (e) {}
-const save = () => { try { const all = JSON.parse(localStorage.getItem('catchit.v1') || '{}'); all.mapLines = cfg.mapLines; localStorage.setItem('catchit.v1', JSON.stringify(all)); } catch (e) {} };
+const save = () => { try { const all = JSON.parse(localStorage.getItem('catchit.v1') || '{}'); all.mapLines = cfg.mapLines; all.view = cfg.view; localStorage.setItem('catchit.v1', JSON.stringify(all)); } catch (e) {} };
 const getJSON = async (u, opt) => { const r = await fetch(u, opt); if (!r.ok) throw new Error(r.status + ''); return r.json(); };
 const DEG = Math.PI / 180;
 const hav = (a, b) => { const dLat = (b[1] - a[1]) * DEG, dLon = (b[0] - a[0]) * DEG; const x = Math.sin(dLat / 2) ** 2 + Math.cos(a[1] * DEG) * Math.cos(b[1] * DEG) * Math.sin(dLon / 2) ** 2; return 2 * 6371000 * Math.asin(Math.sqrt(x)); };
 const bearing = (a, b) => { const y = Math.sin((b[0] - a[0]) * DEG) * Math.cos(b[1] * DEG); const x = Math.cos(a[1] * DEG) * Math.sin(b[1] * DEG) - Math.sin(a[1] * DEG) * Math.cos(b[1] * DEG) * Math.cos((b[0] - a[0]) * DEG); return (Math.atan2(y, x) / DEG + 360) % 360; };
 const offset = (p, brg, m) => { const d = m / 6371000, b = brg * DEG, la = p[1] * DEG, lo = p[0] * DEG; const la2 = Math.asin(Math.sin(la) * Math.cos(d) + Math.cos(la) * Math.sin(d) * Math.cos(b)); const lo2 = lo + Math.atan2(Math.sin(b) * Math.sin(d) * Math.cos(la), Math.cos(d) - Math.sin(la) * Math.sin(la2)); return [lo2 / DEG, la2 / DEG]; };
-function measure(path) { const cum = [0]; for (let i = 1; i < path.length; i++) cum.push(cum[i - 1] + hav(path[i - 1], path[i])); return cum; }
-function along(path, cum, f) {           // point + heading at fraction f of a path, by distance
-  if (path.length < 2) return {p: path[0], h: 0};
-  const L = cum.at(-1) * Math.max(0, Math.min(1, f)); let i = 1; while (i < cum.length - 1 && cum[i] < L) i++;
+const measure = path => { const cum = [0]; for (let i = 1; i < path.length; i++) cum.push(cum[i - 1] + hav(path[i - 1], path[i])); return cum; };
+function at(g, L) {                        // point and heading at distance L along a measured path
+  const {path, cum} = g; if (path.length < 2) return {p: path[0], h: 0};
+  L = Math.max(0, Math.min(cum.at(-1), L)); let i = 1; while (i < cum.length - 1 && cum[i] < L) i++;
   const seg = cum[i] - cum[i - 1] || 1, t = (L - cum[i - 1]) / seg, a = path[i - 1], b = path[i];
   return {p: [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t], h: bearing(a, b)};
 }
-function solar(lat, lon, t) {            // sun azimuth (clockwise from north) and elevation, radians
+function solar(lat, lon, t) {
   const d0 = new Date(t), doy = Math.floor((t - Date.UTC(d0.getUTCFullYear(), 0, 0)) / 864e5);
   const dec = 23.44 * Math.sin((284 + doy) / 365 * 2 * Math.PI) * DEG, la = lat * DEG;
   const hrs = d0.getUTCHours() + d0.getUTCMinutes() / 60 + lon / 15, ha = (hrs - 12) * 15 * DEG;
@@ -111,45 +113,169 @@ function solar(lat, lon, t) {            // sun azimuth (clockwise from north) a
   return {az: (az + 2 * Math.PI) % (2 * Math.PI), el};
 }
 
-/* ---------- map ---------- */
-const home = cfg.places.find(p => p.lat) || {lat: 51.5074, lon: -0.1278};
-const map = new maplibregl.Map({container: 'map', style: 'https://tiles.openfreemap.org/styles/liberty', center: [home.lon, home.lat], zoom: 14, maxPitch: 85, attributionControl: {compact: true}});
+/* ---------- styles: map, satellite, 3D world ---------- */
+const FONTS = 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf';
+function satStyle(buildings) {
+  const layers = [{id: 'sat', type: 'raster', source: 'sat', paint: {'raster-fade-duration': 150}}];
+  if (buildings) layers.push({id: 'bld', type: 'fill-extrusion', source: 'omt', 'source-layer': 'building', minzoom: 14, paint: {'fill-extrusion-color': ['interpolate', ['linear'], ['coalesce', ['get', 'render_height'], 8], 0, '#cfc8bd', 30, '#e2ded6', 120, '#eef0f2'], 'fill-extrusion-height': ['coalesce', ['get', 'render_height'], 8], 'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0], 'fill-extrusion-opacity': 0.92, 'fill-extrusion-vertical-gradient': true}});
+  layers.push({id: 'road-names', type: 'symbol', source: 'omt', 'source-layer': 'transportation_name', minzoom: 15, layout: {'text-field': ['get', 'name'], 'text-font': ['Noto Sans Regular'], 'symbol-placement': 'line', 'text-size': 12}, paint: {'text-color': '#ffffff', 'text-halo-color': 'rgba(0,0,0,.75)', 'text-halo-width': 1.4}});
+  layers.push({id: 'place-names', type: 'symbol', source: 'omt', 'source-layer': 'place', layout: {'text-field': ['get', 'name'], 'text-font': ['Noto Sans Bold'], 'text-size': 13}, paint: {'text-color': '#ffffff', 'text-halo-color': 'rgba(0,0,0,.8)', 'text-halo-width': 1.6}});
+  return {version: 8, glyphs: FONTS, sources: {
+    sat: {type: 'raster', tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], tileSize: 256, maxzoom: 19, attribution: 'Imagery © Esri, Maxar, Earthstar Geographics'},
+    omt: {type: 'vector', url: 'https://tiles.openfreemap.org/planet', attribution: '© OpenFreeMap © OpenStreetMap'}
+  }, layers};
+}
+const home = cfg.places.find(p => p.lat) || (cfg.home ? {lat: cfg.home[1], lon: cfg.home[0]} : {lat: 51.5074, lon: -0.1278});
+const map = new maplibregl.Map({container: 'map', style: cfg.view === 'map' ? 'https://tiles.openfreemap.org/styles/liberty' : satStyle(cfg.view === '3d'), center: [home.lon, home.lat], zoom: cfg.view === '3d' ? 16 : 14.5, pitch: cfg.view === '3d' ? 60 : 0, maxPitch: 85, attributionControl: {compact: true}});
 map.addControl(new maplibregl.NavigationControl({visualizePitch: true}), 'top-right');
 for (const p of cfg.places) if (p.lat) { const el = document.createElement('div'); el.className = 'me'; el.title = p.name; new maplibregl.Marker({element: el}).setLngLat([p.lon, p.lat]).setPopup(new maplibregl.Popup({offset: 10}).setText(p.name)).addTo(map); }
-function sunLight() { try { const s = solar(home.lat, home.lon, Date.now()); map.setLight({anchor: 'map', position: [1.4, s.az / DEG, Math.max(10, 90 - s.el / DEG)], intensity: s.el > 0 ? 0.45 : 0.15, color: s.el > 0.2 ? '#fff6e0' : '#9aa6d6'}); } catch (e) {} }
-map.on('load', () => { sunLight(); setInterval(sunLight, 300000); init(); });
+const O = maplibregl.MercatorCoordinate.fromLngLat([home.lon, home.lat], 0), S = O.meterInMercatorCoordinateUnits();
+function setView(v) {
+  cfg.view = v; save();
+  document.querySelectorAll('.seg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === v)));
+  map.setStyle(v === 'map' ? 'https://tiles.openfreemap.org/styles/liberty' : satStyle(v === '3d'));
+  map.easeTo({pitch: v === '3d' ? 60 : 0, zoom: v === '3d' ? Math.max(map.getZoom(), 15.5) : map.getZoom(), duration: 900});
+}
+document.querySelectorAll('.seg button').forEach(b => { b.setAttribute('aria-pressed', String(b.dataset.v === cfg.view)); b.addEventListener('click', () => setView(b.dataset.v)); });
+map.on('style.load', addOverlays);
+function addOverlays() {
+  const is3d = cfg.view === '3d';
+  if (is3d) {
+    if (!map.getSource('dem')) map.addSource('dem', {type: 'raster-dem', tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], encoding: 'terrarium', tileSize: 256, maxzoom: 15, attribution: 'Terrain: AWS Terrain Tiles'});
+    try { map.setTerrain({source: 'dem', exaggeration: 1}); } catch (e) {}
+  }
+  for (const l of found) if (cfg.mapLines?.includes(l.id) && l.ls) drawLine(l);
+  map.addSource('veh', {type: 'geojson', data: {type: 'FeatureCollection', features: []}});
+  map.addLayer({id: 'veh-dot', type: 'circle', source: 'veh', paint: {'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 4, 15, 8], 'circle-color': ['get', 'c'], 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 2, 'circle-opacity': is3d ? ['interpolate', ['linear'], ['zoom'], 14.5, 1, 15.5, 0] : 1, 'circle-stroke-opacity': is3d ? ['interpolate', ['linear'], ['zoom'], 14.5, 1, 15.5, 0] : 1}});
+  map.addLayer({id: 'veh-lbl', type: 'symbol', source: 'veh', minzoom: 14, maxzoom: is3d ? 15.5 : 24, layout: {'text-field': ['get', 'l'], 'text-font': ['Noto Sans Bold'], 'text-size': 11, 'text-offset': [0, -1.4], 'text-allow-overlap': false}, paint: {'text-color': '#ffffff', 'text-halo-color': ['get', 'c'], 'text-halo-width': 2.2}});
+  if (is3d) { for (const k in veh) veh[k].model = null; map.addLayer(threeLayer()); }
+  sky();
+}
+function sky() {
+  const s = solar(home.lat, home.lon, Date.now()), day = s.el > 0.05, dusk = s.el > -0.1 && !day;
+  try { map.setSky({'sky-color': day ? '#79b2ec' : dusk ? '#e08a6a' : '#0b1430', 'horizon-color': day ? '#eef3f7' : dusk ? '#f5c48a' : '#26305a', 'fog-color': day ? '#dfe8f0' : '#1b2244', 'sky-horizon-blend': 0.6, 'horizon-fog-blend': 0.7, 'fog-ground-blend': 0.75, 'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 12, 0]}); } catch (e) {}
+  try { if (map.getLayer('sat')) map.setPaintProperty('sat', 'raster-brightness-max', day ? 1 : dusk ? 0.75 : 0.45); } catch (e) {}
+  try { map.setLight({anchor: 'map', position: [1.4, s.az / DEG, Math.max(10, 90 - s.el / DEG)], intensity: day ? 0.45 : 0.2, color: day ? '#fff6e0' : '#9aa6d6'}); } catch (e) {}
+  if (three) { const d = new THREE.Vector3(Math.sin(s.az) * Math.cos(s.el), Math.max(0.15, Math.sin(s.el)), -Math.cos(s.az) * Math.cos(s.el)); three.sun.position.copy(d); three.sun.intensity = day ? 0.95 : 0.25; three.hemi.intensity = day ? 0.8 : 0.35; }
+}
+setInterval(sky, 300000);
+
+/* ---------- 3D vehicles (Three.js inside MapLibre) ---------- */
+let three = null;
+const GEO = {}, MAT = {};
+const mat = c => MAT[c] || (MAT[c] = new THREE.MeshLambertMaterial({color: c}));
+const boxG = (w, h, d) => GEO[w + ',' + h + ',' + d] || (GEO[w + ',' + h + ',' + d] = new THREE.BoxGeometry(w, h, d));
+const box = (w, h, d, c, x, y, z) => { const m = new THREE.Mesh(boxG(w, h, d), mat(c)); m.position.set(x, y, z); return m; };
+const wheelG = () => GEO.wheel || (GEO.wheel = new THREE.CylinderGeometry(0.5, 0.5, 0.32, 14).rotateX(Math.PI / 2));
+const signs = {};
+function signTex(txt, bg) {
+  if (signs[txt + bg]) return signs[txt + bg];
+  const c = document.createElement('canvas'); c.width = 256; c.height = 64; const g = c.getContext('2d');
+  g.fillStyle = '#111'; g.fillRect(0, 0, 256, 64); g.fillStyle = '#ffb000'; g.font = 'bold 44px Overpass, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, 128, 34);
+  const t = new THREE.CanvasTexture(c); return signs[txt + bg] = new THREE.MeshBasicMaterial({map: t});
+}
+function makeBus(route) {
+  const g = new THREE.Group(), red = '#c8102e', glass = '#1d2533';
+  g.add(box(11.2, 3.95, 2.5, red, 0, 2.5, 0));
+  g.add(box(9.6, 0.95, 2.54, glass, 0.4, 2.05, 0));
+  g.add(box(10.7, 0.95, 2.54, glass, 0, 3.55, 0));
+  g.add(box(0.06, 1.7, 2.2, glass, 5.62, 2.3, 0));
+  g.add(box(0.06, 0.9, 2.2, glass, 5.62, 3.55, 0));
+  g.add(box(11.0, 0.12, 2.42, '#eceef2', 0, 4.53, 0));
+  g.add(box(11.25, 0.3, 2.56, '#2a2a2e', 0, 0.75, 0));
+  for (const x of [-3.7, 3.6]) for (const z of [-1.15, 1.15]) { const w = new THREE.Mesh(wheelG(), mat('#16161a')); w.position.set(x, 0.5, z); g.add(w); }
+  const s = new THREE.Mesh(GEO.sign || (GEO.sign = new THREE.PlaneGeometry(1.7, 0.42).rotateY(Math.PI / 2)), signTex(route)); s.position.set(5.66, 4.2, 0); g.add(s);
+  return g;
+}
+const LIVERY = {elizabeth: {cars: 9, L: 22.5, H: 3.4, W: 2.75, body: '#f1f2f5', band: '#6950a1', door: '#6950a1'}, dlr: {cars: 3, L: 14, H: 3.3, W: 2.65, body: '#eef0f2', band: '#00a4a7', door: '#e03a3e'}, tube: {cars: 7, L: 16, H: 2.9, W: 2.6, body: '#eceef2', band: '#3b3f5c', door: '#dc241f'}, overground: {cars: 4, L: 20, H: 3.4, W: 2.75, body: '#f1f2f5', band: '#ee7c0e', door: '#ee7c0e'}, rail: {cars: 8, L: 22, H: 3.5, W: 2.8, body: '#f1f2f5', band: '#d70428', door: '#d70428'}};
+function livery(l) { const m = l.mode === 'tube' ? 'tube' : l.mode === 'dlr' ? 'dlr' : l.mode === 'overground' ? 'overground' : l.id === 'elizabeth' ? 'elizabeth' : 'rail'; const b = Object.assign({}, LIVERY[m]); if (m === 'tube' || m === 'overground') b.band = l.colour; return b; }
+function makeCar(lv, front, back) {
+  const g = new THREE.Group(), {L, H, W} = lv, base = 0.95;
+  g.add(box(L, H, W, lv.body, 0, base + H / 2, 0));
+  g.add(box(L - 1.4, H * 0.26, W + 0.04, '#1b2230', 0, base + H * 0.64, 0));
+  g.add(box(L - 0.3, 0.22, W + 0.05, lv.band, 0, base + H * 0.3, 0));
+  for (const x of [-L / 3.2, 0, L / 3.2]) g.add(box(1.4, H * 0.8, W + 0.07, lv.door, x, base + H * 0.42, 0));
+  g.add(box(L - 0.3, 0.16, W - 0.35, '#a3a8b2', 0, base + H + 0.08, 0));
+  for (const x of [-(L / 2 - 3), L / 2 - 3]) g.add(box(2.6, 0.65, W - 0.5, '#2c2c30', x, 0.5, 0));
+  if (front) { g.add(box(0.7, H * 0.92, W - 0.15, lv.band, L / 2 + 0.3, base + H * 0.47, 0)); g.add(box(0.1, H * 0.3, W - 0.6, '#1b2230', L / 2 + 0.68, base + H * 0.68, 0)); }
+  if (back) g.add(box(0.5, H * 0.92, W - 0.15, lv.band, -L / 2 - 0.2, base + H * 0.47, 0));
+  return g;
+}
+function makeTrain(l) { const lv = livery(l), cars = []; for (let i = 0; i < lv.cars; i++) cars.push(makeCar(lv, i === 0, i === lv.cars - 1)); return {cars, lv}; }
+function local(p, alt) { const c = maplibregl.MercatorCoordinate.fromLngLat(p, 0); return new THREE.Vector3((c.x - O.x) / S, alt, (c.y - O.y) / S); }
+function threeLayer() {
+  return {id: 'v3d', type: 'custom', renderingMode: '3d',
+    onAdd(m, gl) {
+      this.camera = new THREE.Camera(); this.scene = new THREE.Scene();
+      this.hemi = new THREE.HemisphereLight(0xffffff, 0x4b5563, 0.8); this.scene.add(this.hemi);
+      this.sun = new THREE.DirectionalLight(0xffffff, 0.95); this.scene.add(this.sun);
+      this.renderer = new THREE.WebGLRenderer({canvas: m.getCanvas(), context: gl, antialias: true}); this.renderer.autoClear = false;
+      this.group = new THREE.Group(); this.scene.add(this.group); three = this; sky();
+    },
+    render(gl, args) {
+      place3D();
+      const mm = args && args.defaultProjectionData ? args.defaultProjectionData.mainMatrix : args;
+      const m = new THREE.Matrix4().fromArray(mm);
+      const l = new THREE.Matrix4().makeTranslation(O.x, O.y, O.z).scale(new THREE.Vector3(S, -S, S)).multiply(new THREE.Matrix4().makeRotationAxis(new THREE.Vector3(1, 0, 0), Math.PI / 2));
+      this.camera.projectionMatrix = m.multiply(l);
+      this.renderer.resetState(); this.renderer.render(this.scene, this.camera); map.triggerRepaint();
+    },
+    onRemove() { three = null; }
+  };
+}
+const elev = p => { try { return map.queryTerrainElevation(p) || 0; } catch (e) { return 0; } };
+function place3D() {
+  if (!three) return;
+  const now = Date.now(), cen = map.getCenter(), z = map.getZoom(), show = z >= 14.3;
+  for (const k in veh) {
+    const v = veh[k];
+    const near = show && v.head && hav(v.head.p, [cen.lng, cen.lat]) < (z > 16 ? 1800 : 3500) && !(ride && ride.v === v && ride.look !== 'F' && false);
+    if (!near) { if (v.model) v.model.visible = false; continue; }
+    if (!v.model) {
+      if (v.line.mode === 'bus') { v.model = {root: makeBus(v.label)}; three.group.add(v.model.root); }
+      else { const t = makeTrain(v.line); v.model = {cars: t.cars, lv: t.lv}; t.cars.forEach(c => three.group.add(c)); }
+    }
+    if (!v.e || now - v.eAt > 800) { v.e = elev(v.head.p); v.eAt = now; }
+    const hidden = ride && ride.v === v && ride.look !== 'C';
+    if (v.model.root) {
+      const c = at(v.trail, v.D - 5.6); const r = v.model.root;
+      r.visible = !hidden; r.position.copy(local(c.p, v.e)); r.rotation.y = (90 - c.h) * DEG;
+    } else {
+      const {cars, lv} = v.model;
+      cars.forEach((car, i) => { const c = at(v.trail, v.D - (i + 0.5) * (lv.L + 0.9)); car.visible = !hidden; car.position.copy(local(c.p, v.e)); car.rotation.y = (90 - c.h) * DEG; });
+    }
+  }
+}
 
 /* ---------- lines and routes ---------- */
-const lines = {};       // id -> {id, name, mode, colour, seq:{inbound,outbound}, stops, prev:{dir:{stopId:prevId}}, ls:[paths]}
+const lines = {}; let found = [];
 async function discoverLines() {
-  const found = new Map();
+  const f = new Map();
   await Promise.all(cfg.places.filter(p => p.tflId).map(async p => {
     try {
       const sp = await getJSON(TFL + '/StopPoint/' + encodeURIComponent(p.tflId));
-      const add = (l, mode) => { if (!found.has(l.id)) found.set(l.id, {id: l.id, name: l.name, mode, place: p}); };
       const modeOf = id => (sp.lineModeGroups || []).find(g => g.lineIdentifier?.includes(id))?.modeName || (sp.modes || [])[0];
-      (sp.lines || []).forEach(l => add(l, modeOf(l.id)));
-      (sp.children || []).forEach(c => (c.lines || []).forEach(l => { if (p.tflId === c.naptanId) add(l, 'bus'); }));
+      (sp.lines || []).forEach(l => { if (!f.has(l.id)) f.set(l.id, {id: l.id, name: l.name, mode: modeOf(l.id)}); });
     } catch (e) {}
   }));
-  return [...found.values()].filter(l => l.mode !== 'national-rail');
+  return [...f.values()].filter(l => l.mode && l.mode !== 'national-rail');
 }
 async function loadRoute(l) {
-  if (l.seq) return l;
-  l.seq = {}; l.stops = {}; l.prev = {}; l.ls = []; l.order = {};
+  if (l.ls) return l;
+  const ls = [], stops = {}, prev = {}, order = {};
   for (const dir of ['outbound', 'inbound']) {
     try {
       const d = await getJSON(TFL + '/Line/' + encodeURIComponent(l.id) + '/Route/Sequence/' + dir);
-      (d.lineStrings || []).forEach(s => { try { JSON.parse(s).forEach(part => l.ls.push(part)); } catch (e) {} });
-      l.prev[dir] = {}; l.order[dir] = [];
-      (d.stopPointSequences || []).forEach(sq => { let last = null; sq.stopPoint.forEach(sp => { l.stops[sp.id] = {id: sp.id, name: sp.name, ll: [sp.lon, sp.lat], station: sp.stationId || sp.topMostParentId}; if (last) l.prev[dir][sp.id] = last; last = sp.id; }); });
-      (d.orderedLineRoutes || []).forEach(r => l.order[dir].push({name: r.name, ids: r.naptanIds}));
+      (d.lineStrings || []).forEach(s => { try { JSON.parse(s).forEach(part => ls.push(part)); } catch (e) {} });
+      prev[dir] = {}; order[dir] = [];
+      (d.stopPointSequences || []).forEach(sq => { let last = null; sq.stopPoint.forEach(sp => { stops[sp.id] = {id: sp.id, name: sp.name, ll: [sp.lon, sp.lat], station: sp.stationId || sp.topMostParentId}; if (last) prev[dir][sp.id] = last; last = sp.id; }); });
+      (d.orderedLineRoutes || []).forEach(r => order[dir].push({name: r.name, ids: r.naptanIds}));
     } catch (e) {}
   }
-  return l;
+  Object.assign(l, {ls, stops, prev, order}); return l;
 }
 const pathCache = {};
-function pathBetween(l, a, b) {          // real road/track geometry between two stops, by nearest points on the route lines
+function pathBetween(l, a, b) {
   const key = l.id + a + b; if (pathCache[key]) return pathCache[key];
   const A = l.stops[a]?.ll, B = l.stops[b]?.ll; if (!A || !B) return null;
   let best = null;
@@ -158,23 +284,65 @@ function pathBetween(l, a, b) {          // real road/track geometry between two
     for (let i = 0; i < s.length; i++) { const x = hav(s[i], A), y = hav(s[i], B); if (x < da) { da = x; ia = i; } if (y < db) { db = y; ib = i; } }
     if (da < 120 && db < 120 && ia !== ib) {
       const seg = ia < ib ? s.slice(ia, ib + 1) : s.slice(ib, ia + 1).reverse();
-      const len = measure(seg).at(-1), direct = hav(A, B);
-      if (len < direct * 3 && (!best || len < best.len)) best = {path: [A, ...seg, B], len};
+      const len = measure(seg).at(-1);
+      if (len < hav(A, B) * 3 && (!best || len < best.len)) best = {path: seg, len};
     }
   }
-  const out = best ? best.path : [A, B]; pathCache[key] = {path: out, cum: measure(out)}; return pathCache[key];
+  let path = smooth(best ? best.path : [A, B]);
+  if (l.mode !== 'bus' && railNet) path = path.map(snap);
+  return pathCache[key] = {path, cum: measure(path)};
+}
+/* real railway tracks from OpenStreetMap: TfL's line shapes are rough, so trains are snapped onto the real rails */
+let railNet = null;
+async function loadRail() {
+  const pts = cfg.places.filter(p => p.lat); if (!pts.length) return;
+  const la = pts.map(p => p.lat), lo = pts.map(p => p.lon);
+  const bb = [Math.min(...la) - 0.05, Math.min(...lo) - 0.08, Math.max(...la) + 0.05, Math.max(...lo) + 0.08].map(v => v.toFixed(4)).join(',');
+  const q = `[out:json][timeout:25];way["railway"~"^(rail|subway|light_rail)$"]["service"!~"yard|siding|spur"](${bb});out geom;`;
+  for (const host of ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter']) {
+    try {
+      const d = await getJSON(host, {method: 'POST', body: 'data=' + encodeURIComponent(q), headers: {'Content-Type': 'application/x-www-form-urlencoded'}, signal: AbortSignal.timeout(30000)});
+      const grid = new Map(), C = 0.003, key = (x, y) => Math.floor(x / C) + ',' + Math.floor(y / C);
+      for (const w of d.elements || []) { const g = w.geometry || []; for (let i = 1; i < g.length; i++) { const a = [g[i - 1].lon, g[i - 1].lat], b = [g[i].lon, g[i].lat]; const ks = new Set([key(a[0], a[1]), key(b[0], b[1]), key((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)]); ks.forEach(k => { if (!grid.has(k)) grid.set(k, []); grid.get(k).push([a, b]); }); } }
+      railNet = {grid, C};
+      for (const k in pathCache) if (lines[k.split(/(?=490|910|940)/)[0]]?.mode !== 'bus') delete pathCache[k];
+      for (const k in veh) if (veh[k].line.mode !== 'bus') veh[k].next = null;
+      for (const l of found) if (l.mode !== 'bus' && l.ls && !l.snapped) { l.snapped = true; l.ls = l.ls.map(c => c.map(snap)); const s = map.getSource('ln-' + l.id); if (s) s.setData({type: 'FeatureCollection', features: l.ls.map(c => ({type: 'Feature', geometry: {type: 'LineString', coordinates: c}, properties: {}}))}); }
+      return;
+    } catch (e) {}
+  }
+}
+function snap(p) {
+  const {grid, C} = railNet, cx = Math.floor(p[0] / C), cy = Math.floor(p[1] / C), kx = Math.cos(p[1] * DEG);
+  let best = null, bd = 90;
+  for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (const [a, b] of grid.get((cx + dx) + ',' + (cy + dy)) || []) {
+    const ax = (b[0] - a[0]) * kx, ay = b[1] - a[1], px = (p[0] - a[0]) * kx, py = p[1] - a[1], L2 = ax * ax + ay * ay || 1e-12;
+    const t = Math.max(0, Math.min(1, (px * ax + py * ay) / L2)), q = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t], d = hav(p, q);
+    if (d < bd) { bd = d; best = q; }
+  }
+  return best || p;
+}
+function smooth(p) {                       // Catmull-Rom spline through the route points, so vehicles curve instead of zig-zag
+  if (p.length < 3) return p; const out = [p[0]];
+  for (let i = 0; i < p.length - 1; i++) {
+    const p0 = p[Math.max(0, i - 1)], p1 = p[i], p2 = p[i + 1], p3 = p[Math.min(p.length - 1, i + 2)];
+    const n = Math.min(6, Math.max(1, Math.round(hav(p1, p2) / 12)));
+    for (let k = 1; k <= n; k++) { const t = k / n, t2 = t * t, t3 = t2 * t; out.push([0, 1].map(j => 0.5 * ((2 * p1[j]) + (-p0[j] + p2[j]) * t + (2 * p0[j] - 5 * p1[j] + 4 * p2[j] - p3[j]) * t2 + (-p0[j] + 3 * p1[j] - 3 * p2[j] + p3[j]) * t3))); }
+  }
+  return out;
 }
 function drawLine(l) {
   const id = 'ln-' + l.id, fc = {type: 'FeatureCollection', features: l.ls.map(c => ({type: 'Feature', geometry: {type: 'LineString', coordinates: c}, properties: {}}))};
-  if (map.getSource(id)) { map.getSource(id).setData(fc); return; }
+  if (map.getSource(id)) return;
   map.addSource(id, {type: 'geojson', data: fc});
-  map.addLayer({id: id + '-casing', type: 'line', source: id, paint: {'line-color': '#ffffff', 'line-width': 7, 'line-opacity': 0.8}, layout: {'line-cap': 'round', 'line-join': 'round'}});
-  map.addLayer({id, type: 'line', source: id, paint: {'line-color': l.colour, 'line-width': 4}, layout: {'line-cap': 'round', 'line-join': 'round'}});
+  const before = map.getLayer('veh-dot') ? 'veh-dot' : undefined;
+  map.addLayer({id: id + '-c', type: 'line', source: id, paint: {'line-color': '#ffffff', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 3, 16, 8], 'line-opacity': 0.7}, layout: {'line-cap': 'round', 'line-join': 'round'}}, before);
+  map.addLayer({id, type: 'line', source: id, paint: {'line-color': l.colour, 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 1.5, 16, 4], 'line-opacity': 0.85}, layout: {'line-cap': 'round', 'line-join': 'round'}}, before);
 }
-function hideLine(l) { for (const id of ['ln-' + l.id, 'ln-' + l.id + '-casing']) if (map.getLayer(id)) map.removeLayer(id); if (map.getSource('ln-' + l.id)) map.removeSource('ln-' + l.id); }
+function hideLine(l) { for (const id of ['ln-' + l.id, 'ln-' + l.id + '-c']) if (map.getLayer(id)) map.removeLayer(id); if (map.getSource('ln-' + l.id)) map.removeSource('ln-' + l.id); }
 
 /* ---------- live vehicles ---------- */
-const veh = {};          // vehicleId -> state
+const veh = {};
 function kal(v, z, sigma) { const R = (sigma * 1000) ** 2, Q = 1e8; if (v.P == null || Math.abs(z - v.t) > 180000) { v.t = z; v.P = R; return; } v.P += Q; const K = v.P / (v.P + R); v.t += K * (z - v.t); v.P *= 1 - K; }
 async function pullVehicles(l) {
   let preds = [];
@@ -182,8 +350,7 @@ async function pullVehicles(l) {
   else {
     const ids = new Set();
     for (const dir in l.order) for (const r of l.order[dir]) { const near = r.ids.findIndex(id => cfg.places.some(p => p.tflId && (p.tflId === id || l.stops[id]?.station === p.tflId))); if (near >= 0) r.ids.slice(Math.max(0, near - 4), near + 5).forEach(i => ids.add(i)); }
-    const list = [...ids].slice(0, 10); if (!list.length) return;
-    const got = await Promise.allSettled(list.map(id => getJSON(TFL + '/StopPoint/' + encodeURIComponent(id) + '/Arrivals')));
+    const got = await Promise.allSettled([...ids].slice(0, 10).map(id => getJSON(TFL + '/StopPoint/' + encodeURIComponent(id) + '/Arrivals')));
     preds = got.filter(g => g.status === 'fulfilled').flatMap(g => g.value).filter(x => x.lineId === l.id);
   }
   const by = {};
@@ -194,108 +361,108 @@ async function pullVehicles(l) {
     const dir = x.direction && l.prev[x.direction] ? x.direction : Object.keys(l.prev).find(d => l.prev[d][next]);
     const prevId = dir ? l.prev[dir][next] : null;
     let v = veh[k];
-    if (!v) { v = veh[k] = {k, line: l, label: l.mode === 'bus' ? x.lineName : (l.id === 'elizabeth' ? 'ELIZ' : x.lineName.slice(0, 4).toUpperCase())}; v.el = document.createElement('div'); v.el.className = 'vm' + (l.mode === 'bus' ? '' : ' rail'); v.el.style.background = l.colour; v.el.textContent = v.label; v.marker = new maplibregl.Marker({element: v.el, rotationAlignment: 'viewport'}); v.el.addEventListener('click', () => pop(v)); }
-    if (v.next !== next) { v.from = v.next ? (v.pos || null) : null; v.next = next; v.prevId = prevId; v.geo = prevId ? pathBetween(l, prevId, next) : null; v.P = null; }
+    if (!v) v = veh[k] = {k, line: l, label: l.mode === 'bus' ? x.lineName : l.name};
+    if (v.next !== next) {
+      const g = prevId ? pathBetween(l, prevId, next) : null;
+      if (g) {
+        const old = v.geo && v.prevId !== prevId ? v.geo : null;
+        let tail = old ? old.path : [];
+        if (tail.length) { const c = old.cum, keepFrom = c.findIndex(d => d > c.at(-1) - 300); tail = tail.slice(Math.max(0, keepFrom - 1), -1); }
+        const path = tail.concat(g.path); v.trail = {path, cum: measure(path)}; v.base = v.trail.cum.at(-1) - g.cum.at(-1);
+      } else { const p = l.stops[next]?.ll; if (p) { v.trail = {path: [p, p], cum: [0, 0]}; v.base = 0; } }
+      v.next = next; v.prevId = prevId; v.geo = g; v.P = null; v.dir = dir;
+    }
     kal(v, Date.parse(x.expectedArrival), l.mode === 'bus' ? 60 : 45);
     if (v.shown == null) v.shown = v.t;
-    const dist = v.geo ? v.geo.cum.at(-1) : 400; v.T = Math.max(40, Math.min(360, dist / (l.mode === 'bus' ? 5 : 16)));
-    Object.assign(v, {dest: x.destinationName, stopName: x.stationName, plat: x.platformName, reg: x.vehicleId, last: now});
+    const segLen = v.geo ? v.geo.cum.at(-1) : 0; v.T = Math.max(40, Math.min(360, (segLen || 400) / (l.mode === 'bus' ? 5 : 16)));
+    Object.assign(v, {dest: x.destinationName, stopName: x.stationName, reg: x.vehicleId, last: now});
   }
-  for (const k in veh) if (veh[k].line === l && !seen.has(k)) { veh[k].marker.remove(); delete veh[k]; }
+  for (const k in veh) if (veh[k].line === l && !seen.has(k)) removeVeh(k);
 }
-function pop(v) {
-  const secs = Math.max(0, Math.round((v.shown - Date.now()) / 1000));
-  new maplibregl.Popup({offset: 14}).setLngLat(v.pos).setHTML(`<b>${esc(v.line.mode === 'bus' ? v.label + ' bus' : v.line.name)}</b> to ${esc(v.dest)}<br>Next: ${esc(v.stopName)} in ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}${v.line.mode === 'bus' ? '<br>Registration ' + esc(v.reg) : ''}`).addTo(map);
-}
-let lastF = performance.now();
+function removeVeh(k) { const v = veh[k]; if (v.model) { (v.model.cars || [v.model.root]).forEach(o => o.parent && o.parent.remove(o)); } delete veh[k]; }
+let lastF = performance.now(), lastData = 0;
 function frame(ts) {
   const now = Date.now(), dt = Math.min(0.1, (ts - lastF) / 1000); lastF = ts;
-  const cen = map.getCenter();
   for (const k in veh) {
-    const v = veh[k]; if (!v.t) continue;
+    const v = veh[k]; if (!v.t || !v.trail) continue;
     v.shown += (v.t - v.shown) * Math.min(1, dt * 1.5);
-    const rem = (v.shown - now) / 1000;
-    let pos;
-    if (v.geo) pos = along(v.geo.path, v.geo.cum, 1 - Math.min(1, Math.max(0, rem / v.T))).p;
-    else pos = v.line.stops[v.next]?.ll;
-    if (!pos) continue;
-    if (!v.pos) { v.marker.setLngLat(pos).addTo(map); }
-    v.pos = pos; v.marker.setLngLat(pos);
-    v.el.style.opacity = now - v.last > 180000 ? 0.35 : 1;
-    v.el.style.display = map.getPitch() > 55 && hav(pos, [cen.lng, cen.lat]) > 1600 ? 'none' : '';
+    const segLen = v.geo ? v.geo.cum.at(-1) : 0, rem = (v.shown - now) / 1000;
+    const f = 1 - Math.min(1, Math.max(0, rem / v.T)), target = v.base + f * segLen;
+    v.D = v.D == null || Math.abs(target - v.D) > 400 ? target : v.D + (target - v.D) * Math.min(1, dt * 2.5);
+    v.head = at(v.trail, v.D);
   }
-  fly && flyStep(now);
+  if (now - lastData > 120 && map.getSource('veh')) {
+    lastData = now;
+    map.getSource('veh').setData({type: 'FeatureCollection', features: Object.values(veh).filter(v => v.head).map(v => ({type: 'Feature', geometry: {type: 'Point', coordinates: v.head.p}, properties: {k: v.k, c: v.line.colour, l: v.line.mode === 'bus' ? v.label : v.line.name}}))});
+  }
+  if (ride) rideStep(now);
   requestAnimationFrame(frame);
 }
+map.on('click', 'veh-dot', e => {
+  const v = veh[e.features[0].properties.k]; if (!v) return;
+  const secs = Math.max(0, Math.round((v.shown - Date.now()) / 1000));
+  new maplibregl.Popup({offset: 12}).setLngLat(v.head.p).setHTML(`<b>${esc(v.line.mode === 'bus' ? v.label + ' bus' : v.line.name)}</b> to ${esc(v.dest)}<br>Next stop: ${esc(v.stopName)} in ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}${v.line.mode === 'bus' ? '<br>Registration ' + esc(v.reg) : ''}`).addTo(map);
+});
+map.on('mouseenter', 'veh-dot', () => map.getCanvas().style.cursor = 'pointer');
+map.on('mouseleave', 'veh-dot', () => map.getCanvas().style.cursor = '');
 
-/* ---------- panel: lines ---------- */
-let found = [];
+/* ---------- panel ---------- */
 async function init() {
-  if (!cfg.places.length) { $('#status').innerHTML = 'Add your stops on the <a href="./">Board</a> (Setup) first. Showing central London.'; }
+  if (!cfg.places.length) $('#status').innerHTML = 'Add your stops on the <a href="./">Board</a> first. Showing central London.';
   found = await discoverLines();
   found.forEach(l => { l.colour = l.mode === 'bus' ? '#c8102e' : (LINE_COL[l.id] || '#ee7c0e'); lines[l.id] = l; });
-  if (!cfg.mapLines) cfg.mapLines = found.filter(l => l.mode !== 'bus').map(l => l.id).concat(found.filter(l => l.mode === 'bus').slice(0, 3).map(l => l.id));
-  $('#lines').innerHTML = found.map(l => `<label><input type="checkbox" value="${esc(l.id)}" ${cfg.mapLines.includes(l.id) ? 'checked' : ''}><i style="background:${l.colour}"></i>${esc(l.mode === 'bus' ? l.name : l.name)}</label>`).join('') || '<span class="note">No TfL lines found at your stops yet.</span>';
-  $('#lines').querySelectorAll('input').forEach(i => i.addEventListener('change', () => { cfg.mapLines = [...$('#lines').querySelectorAll('input:checked')].map(x => x.value); save(); sync(); }));
+  const rail = found.filter(l => l.mode !== 'bus'), bus = found.filter(l => l.mode === 'bus');
+  if (!cfg.mapLines) cfg.mapLines = rail.map(l => l.id).concat(bus.slice(0, 2).map(l => l.id));
+  const chip = l => `<label><input type="checkbox" value="${esc(l.id)}" ${cfg.mapLines.includes(l.id) ? 'checked' : ''}><i style="background:${l.colour}"></i>${esc(l.name)}</label>`;
+  $('#rail').innerHTML = rail.map(chip).join('') || '<span class="note">No train lines at your stops.</span>';
+  $('#bus').innerHTML = bus.map(chip).join('');
+  $('#busSum').textContent = `Buses at your stops (${bus.filter(l => cfg.mapLines.includes(l.id)).length} of ${bus.length} shown)`;
+  document.querySelectorAll('.chips input').forEach(i => i.addEventListener('change', () => { cfg.mapLines = [...document.querySelectorAll('.chips input:checked')].map(x => x.value); save(); $('#busSum').textContent = `Buses at your stops (${bus.filter(l => cfg.mapLines.includes(l.id)).length} of ${bus.length} shown)`; sync(); }));
+  if (rail.length) loadRail();
   await sync(); poll(); setInterval(() => { if (!document.hidden) poll(); }, 25000);
   requestAnimationFrame(frame);
 }
 async function sync() {
   for (const l of found) {
-    if (cfg.mapLines.includes(l.id)) { await loadRoute(l); drawLine(l); }
-    else { hideLine(l); for (const k in veh) if (veh[k].line === l) { veh[k].marker.remove(); delete veh[k]; } }
+    if (cfg.mapLines.includes(l.id)) { await loadRoute(l); if (railNet && l.mode !== 'bus' && !l.snapped) { l.snapped = true; l.ls = l.ls.map(c => c.map(snap)); } drawLine(l); }
+    else { hideLine(l); for (const k in veh) if (veh[k].line === l) removeVeh(k); }
   }
   fillRoutes();
 }
 async function poll() {
-  const on = found.filter(l => cfg.mapLines.includes(l.id));
-  const errs = [];
-  await Promise.all(on.map(l => pullVehicles(l).catch(e => errs.push(l.name + ' ' + e.message))));
-  $('#status').textContent = `${Object.keys(veh).length} live vehicles on ${on.length} lines · updated ${new Date().toLocaleTimeString('en-GB', {hour: '2-digit', minute: '2-digit', second: '2-digit'})}` + (errs.length ? ' · problems: ' + errs.join(', ') : '');
+  const on = found.filter(l => cfg.mapLines.includes(l.id)), errs = [];
+  await Promise.all(on.map(l => pullVehicles(l).catch(e => errs.push(l.name))));
+  $('#status').textContent = `${Object.keys(veh).length} live vehicles · updated ${new Date().toLocaleTimeString('en-GB', {hour: '2-digit', minute: '2-digit'})}` + (errs.length ? ' · no data for ' + errs.join(', ') : '');
 }
+map.once('load', init);
+$('#grab').addEventListener('click', () => $('#panel').classList.toggle('min'));
 
-/* ---------- 3D and fit ---------- */
-$('#b3d').addEventListener('click', e => { const on = e.currentTarget.getAttribute('aria-pressed') !== 'true'; e.currentTarget.setAttribute('aria-pressed', String(on)); map.easeTo({pitch: on ? 62 : 0, zoom: on ? Math.max(map.getZoom(), 15.5) : map.getZoom(), duration: 1200}); });
-$('#bFit').addEventListener('click', () => { const pts = cfg.places.filter(p => p.lat); if (!pts.length) return; const b = new maplibregl.LngLatBounds(); pts.forEach(p => b.extend([p.lon, p.lat])); map.fitBounds(b, {padding: 120, maxZoom: 16, duration: 1000}); });
-$('#minBtn').addEventListener('click', () => { const p = $('#panel'); p.classList.toggle('min'); $('#minBtn').textContent = p.classList.contains('min') ? 'Show' : 'Hide'; });
-
-/* ---------- window view and seat advisor ---------- */
+/* ---------- ride and seat advisor ---------- */
 let routeOpts = [];
+const mine = (l, id) => cfg.places.some(p => p.tflId && (p.tflId === id || l.stops[id]?.station === p.tflId));
 function fillRoutes() {
   routeOpts = [];
-  for (const l of found.filter(x => cfg.mapLines.includes(x.id) && x.order)) for (const dir in l.order) {
-    for (const r of l.order[dir]) {
-      const near = r.ids.findIndex(id => cfg.places.some(p => p.tflId && (p.tflId === id || l.stops[id]?.station === p.tflId)));
-      if (near < 0 || near >= r.ids.length - 1) continue;
-      const to = l.stops[r.ids.at(-1)]?.name || r.name;
-      if (!routeOpts.some(o => o.l === l && o.to === to)) routeOpts.push({l, ids: r.ids.slice(near, near + 9), to, label: (l.mode === 'bus' ? l.name + ' bus' : l.name) + ' towards ' + to});
-    }
+  for (const l of found.filter(x => cfg.mapLines.includes(x.id) && x.order)) for (const dir in l.order) for (const r of l.order[dir]) {
+    const near = r.ids.findIndex(id => mine(l, id)); if (near < 0 || near >= r.ids.length - 1) continue;
+    const to = (l.stops[r.ids.at(-1)]?.name || r.name).replace(/ (Rail|Underground) Station$/, '');
+    if (!routeOpts.some(o => o.l === l && o.to === to)) routeOpts.push({l, dir, ids: r.ids.slice(near, near + 9), allIds: r.ids, to, label: (l.mode === 'bus' ? l.name + ' bus' : l.name) + ' to ' + to});
   }
   $('#route').innerHTML = '<option value="">Choose a line and direction…</option>' + routeOpts.map((o, i) => `<option value="${i}">${esc(o.label)}</option>`).join('');
 }
-function routePath(o) {
-  const pts = []; for (let i = 1; i < o.ids.length; i++) { const g = pathBetween(o.l, o.ids[i - 1], o.ids[i]); if (g) pts.push(...(pts.length ? g.path.slice(1) : g.path)); }
-  return {path: pts, cum: measure(pts)};
-}
+function routePath(o) { const pts = []; for (let i = 1; i < o.ids.length; i++) { const g = pathBetween(o.l, o.ids[i - 1], o.ids[i]); if (g) pts.push(...(pts.length ? g.path.slice(1) : g.path)); } return {path: pts, cum: measure(pts)}; }
 async function advise() {
   const o = routeOpts[+$('#route').value]; if (!o) return;
   const g = routePath(o); if (g.path.length < 2) { $('#seat').textContent = 'No route shape for this line.'; return; }
-  const speed = o.l.mode === 'bus' ? 5 : 16, t0 = Date.now();
-  let glare = {L: 0, R: 0};
+  const speed = o.l.mode === 'bus' ? 5 : 16, t0 = Date.now(), glare = {L: 0, R: 0};
   for (let i = 1; i < g.path.length; i++) {
-    const d = g.cum[i] - g.cum[i - 1], secs = d / speed, h = bearing(g.path[i - 1], g.path[i]) * DEG;
+    const secs = (g.cum[i] - g.cum[i - 1]) / speed, h = bearing(g.path[i - 1], g.path[i]) * DEG;
     const s = solar(g.path[i][1], g.path[i][0], t0 + g.cum[i] / speed * 1000); if (s.el <= 0.03) continue;
-    const side = Math.sin(s.az - h), w = Math.abs(side) * Math.cos(s.el) * secs / 60;
-    if (side > 0) glare.R += w; else glare.L += w;
+    const side = Math.sin(s.az - h), w = Math.abs(side) * Math.cos(s.el) * secs / 60; if (side > 0) glare.R += w; else glare.L += w;
   }
-  $('#seat').innerHTML = 'Working out the scenery…';
-  const sc = await scenery(g); const pref = $('#pref').value;
-  const score = side => (sc[side] || 0) * 0.6 + (pref === 'avoid' ? -1 : 1) * glare[side];
-  const win = score('L') >= score('R') ? 'L' : 'R';
-  const mins = Math.round(g.cum.at(-1) / speed / 60);
-  $('#seat').innerHTML = `<div class="sidebox">${['L', 'R'].map(s => `<div class="side${s === win ? ' win' : ''}"><span class="note">${s === 'L' ? 'Left' : 'Right'} side</span><b>${glare[s].toFixed(1)} min</b><span class="note">of direct sun · ${sc[s] ?? '?'} parks or water in view</span></div>`).join('')}</div>
-    <p><b>Sit on the ${win === 'L' ? 'left' : 'right'}</b> for the next ${mins} min${sc.err ? '' : ''}. ${pref === 'avoid' ? 'Less sun in your eyes' : 'More sunshine'}${(sc[win] || 0) > (sc[win === 'L' ? 'R' : 'L'] || 0) ? ' and more green or water to look at' : ''}.</p>
-    <p class="note">Left and right = facing the direction of travel. Sun from its real position along the route; scenery from OpenStreetMap parks and water within 250 m.${sc.err ? ' Scenery unavailable right now.' : ''} Tunnels are not counted yet.</p>`;
+  $('#seat').innerHTML = 'Checking the scenery along the route…';
+  const sc = await scenery(g), pref = $('#pref').value;
+  const score = s => (sc[s] || 0) * 0.6 + (pref === 'avoid' ? -1 : 1) * glare[s], win = score('L') >= score('R') ? 'L' : 'R';
+  $('#seat').innerHTML = `<b>Sit on the ${win === 'L' ? 'left' : 'right'}</b> (facing forward) for the next ${Math.round(g.cum.at(-1) / speed / 60)} min.<div class="sidebox">${['L', 'R'].map(s => `<div class="side${s === win ? ' win' : ''}"><span class="note">${s === 'L' ? 'Left' : 'Right'}</span><b>${glare[s].toFixed(1)} min sun</b><span class="note">${sc.err ? 'scenery n/a' : sc[s] + ' parks or water'}</span></div>`).join('')}</div>`;
 }
 async function scenery(g) {
   const lats = g.path.map(p => p[1]), lons = g.path.map(p => p[0]);
@@ -310,8 +477,7 @@ async function scenery(g) {
         let bi = 0, bd = 1e9; for (let i = 0; i < g.path.length; i++) { const x = hav(g.path[i], P); if (x < bd) { bd = x; bi = i; } }
         if (bd > 250) continue;
         const a = g.path[Math.max(0, bi - 1)], b = g.path[Math.min(g.path.length - 1, bi + 1)];
-        const cross = (b[0] - a[0]) * (P[1] - a[1]) - (b[1] - a[1]) * (P[0] - a[0]);
-        if (cross > 0) out.L++; else out.R++;
+        if ((b[0] - a[0]) * (P[1] - a[1]) - (b[1] - a[1]) * (P[0] - a[0]) > 0) out.L++; else out.R++;
       }
       return out;
     } catch (e) {}
@@ -321,27 +487,52 @@ async function scenery(g) {
 $('#route').addEventListener('change', advise);
 $('#pref').addEventListener('change', advise);
 
-let fly = null;
-function startFly(side) {
+let ride = null;
+function startRide(live) {
   const o = routeOpts[+$('#route').value]; if (!o) { $('#seat').textContent = 'Choose a line and direction first.'; return; }
-  const g = routePath(o); if (g.path.length < 2) return;
-  const dur = Math.max(25000, Math.min(60000, g.cum.at(-1) / 60 * 1000));
-  fly = {g, side, start: Date.now(), dur, label: o.label};
-  $('#b3d').setAttribute('aria-pressed', 'true');
-  $('#hud').classList.add('on'); $('#panel').classList.add('flying');
+  if (cfg.view !== '3d') setView('3d');
+  let v = null;
+  if (live) {
+    const idx = id => o.allIds.indexOf(id), mineIdx = o.allIds.findIndex(id => mine(o.l, id));
+    const cands = Object.values(veh).filter(x => x.line === o.l && x.head && idx(x.next) >= 0);
+    cands.sort((a, b) => Math.abs(idx(a.next) - mineIdx) - Math.abs(idx(b.next) - mineIdx));
+    v = cands.find(x => idx(x.next) <= mineIdx + 1) || cands[0];
+    if (!v) { $('#seat').textContent = 'No live vehicle on this route right now, showing a fast preview instead.'; live = false; }
+  }
+  const g = live ? null : routePath(o);
+  ride = {v, g, live, start: Date.now(), dur: g ? Math.max(30000, Math.min(70000, g.cum.at(-1) / 50 * 1000)) : 0, look: ride?.look || 'C', o};
+  $('#hud').classList.add('on'); $('#panel').classList.add('riding'); syncLook();
 }
-function flyStep(now) {
-  const f = (now - fly.start) / fly.dur;
-  if (f >= 1) { stopFly(); return; }
-  const a = along(fly.g.path, fly.g.cum, f), look = (a.h + (fly.side === 'L' ? -90 : 90) + 360) % 360;
-  map.jumpTo({center: offset(a.p, look, 70), bearing: look, pitch: 76, zoom: 17.4});
-  $('#hudTxt').textContent = `${fly.side === 'L' ? 'Left' : 'Right'} window · ${fly.label} · ${Math.round(f * 100)}%`;
+function syncLook() { $('#frame').classList.toggle('on', !!ride && ride.look !== 'C'); document.querySelectorAll('[data-look]').forEach(b => b.setAttribute('aria-pressed', String(ride && b.dataset.look === ride.look))); }
+function rideStep(now) {
+  let pos, h, eye;
+  if (ride.live) {
+    const v = ride.v; if (!veh[v.k] || !v.head) { stopRide(); return; }
+    const back = v.line.mode === 'bus' ? 2.5 : 30, c = at(v.trail, v.D - back); pos = c.p; h = c.h; eye = v.line.mode === 'bus' ? 4.1 : 2.4;
+    const secs = Math.max(0, Math.round((v.shown - now) / 1000));
+    $('#hudTxt').textContent = `${v.line.mode === 'bus' ? v.label + ' bus' : v.line.name} · live · next ${v.stopName} ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+  } else {
+    const f = (now - ride.start) / ride.dur; if (f >= 1) { stopRide(); return; }
+    const c = at(ride.g, f * ride.g.cum.at(-1)); pos = c.p; h = c.h; eye = ride.o.l.mode === 'bus' ? 4.1 : 2.4;
+    $('#hudTxt').textContent = `Preview · ${ride.o.label} · ${Math.round(f * 100)}%`;
+  }
+  if (ride.look === 'C') {                 // chase camera: behind and above, looking at the vehicle
+    const from = offset(pos, (h + 180) % 360, ride.live && ride.v.line.mode !== 'bus' ? 120 : 45), g0 = elev(pos);
+    try { map.jumpTo(map.calculateCameraOptionsFromTo(new maplibregl.LngLat(from[0], from[1]), g0 + (ride.live && ride.v.line.mode !== 'bus' ? 45 : 22), new maplibregl.LngLat(pos[0], pos[1]), g0 + 3)); } catch (e) { map.jumpTo({center: pos, bearing: h, pitch: 70, zoom: 17.5}); }
+    return;
+  }
+  const look = (h + (ride.look === 'L' ? -90 : ride.look === 'R' ? 90 : 0) + 360) % 360;
+  // window views sit a little above the roof, so the 3D buildings and crisp imagery read clearly (ground-level imagery smears)
+  const ground = elev(pos), from = offset(pos, (look + 180) % 360, 12), tgt = offset(pos, look, ride.look === 'F' ? 260 : 170);
+  try { map.jumpTo(map.calculateCameraOptionsFromTo(new maplibregl.LngLat(from[0], from[1]), ground + eye + 22, new maplibregl.LngLat(tgt[0], tgt[1]), elev(tgt) + 2)); }
+  catch (e) { map.jumpTo({center: tgt, bearing: look, pitch: 82, zoom: 18.2}); }
 }
-function stopFly() { fly = null; $('#hud').classList.remove('on'); $('#panel').classList.remove('flying'); map.easeTo({pitch: 50, zoom: 15, duration: 800}); }
-$('#flyL').addEventListener('click', () => startFly('L'));
-$('#flyR').addEventListener('click', () => startFly('R'));
-$('#hudStop').addEventListener('click', stopFly);
-window.__cimap = {veh, lines: () => found, routeOpts: () => routeOpts};
+function stopRide() { ride = null; $('#frame').classList.remove('on'); $('#hud').classList.remove('on'); $('#panel').classList.remove('riding'); map.easeTo({pitch: 55, zoom: 16, duration: 900}); }
+$('#ride').addEventListener('click', () => startRide(true));
+$('#preview').addEventListener('click', () => startRide(false));
+$('#hudStop').addEventListener('click', stopRide);
+document.querySelectorAll('[data-look]').forEach(b => b.addEventListener('click', () => { if (ride) { ride.look = b.dataset.look; syncLook(); } }));
+window.__cimap = {veh, lines: () => found, routeOpts: () => routeOpts, map, three: () => three};
 }
 </script>
 </body>

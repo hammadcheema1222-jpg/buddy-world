@@ -47,13 +47,13 @@ input,select{min-height:44px;border-radius:10px;border:1px solid var(--line);bac
 .trip b{font-size:22px}
 .legend{display:flex;gap:14px;flex-wrap:wrap;color:var(--muted);font-size:13px;margin:18px 2px 6px}
 .legend span{display:inline-flex;gap:6px;align-items:center}.legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
-.row{border-bottom:1px solid var(--line);padding:12px 2px;display:grid;grid-template-columns:64px minmax(0,1fr) 84px;gap:4px 12px;align-items:center;cursor:pointer}
+.row{border-bottom:1px solid var(--line);padding:12px 2px;display:grid;grid-template-columns:64px minmax(0,1fr) 84px;gap:6px 12px;align-items:center;cursor:pointer}
 .row:hover{background:var(--panel)}
 .row.gone{opacity:.45}
-.badge{grid-row:span 2;height:40px;border-radius:8px;color:#fff;font-weight:800;display:grid;place-items:center;font-size:15px;padding:0 4px;text-align:center;line-height:1}
+.badge{grid-row:span 3;height:40px;border-radius:8px;color:#fff;font-weight:800;display:grid;place-items:center;font-size:15px;padding:0 4px;text-align:center;line-height:1}
 .dest{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dest small{color:var(--muted);font-weight:400;margin-left:6px}
-.when{text-align:right;font-weight:800;font-size:20px;grid-row:span 2;line-height:1.1}
+.when{text-align:right;font-weight:800;font-size:22px;line-height:1.1}
 .when small{display:block;font-size:12px;color:var(--muted);font-weight:600}
 .track{position:relative;height:44px;border-radius:12px;background:var(--panel);overflow:hidden}
 .track .tick{position:absolute;bottom:2px;font-size:10px;color:var(--muted);transform:translateX(-50%);font-weight:600}
@@ -61,8 +61,13 @@ input,select{min-height:44px;border-radius:10px;border:1px solid var(--line);bac
 .track .fill{position:absolute;left:0;top:0;bottom:0;background:light-dark(#e6e1f4,#272246)}
 .track .now{position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--ink)}
 .mk{position:absolute;transform:translate(-50%,-50%);will-change:left}
-.veh{top:13px;width:32px;height:18px;border-radius:5px;color:#fff;font-size:10px;font-weight:800;display:grid;place-items:center;box-shadow:0 1px 3px rgba(0,0,0,.25);z-index:2}
-.you{top:29px;width:16px;height:16px;border-radius:50%;border:2px solid var(--bg);font-size:8px;font-weight:800;color:#fff;display:grid;place-items:center}
+.veh{top:13px;padding:0 5px;min-width:32px;height:18px;border-radius:5px;color:#fff;font-size:10px;font-weight:800;display:grid;place-items:center;box-shadow:0 1px 3px rgba(0,0,0,.25);z-index:2}
+.you{top:30px;height:18px;padding:0 6px;border-radius:9px;border:2px solid var(--bg);font-size:10px;font-weight:800;color:#fff;display:grid;place-items:center}
+.verdict{grid-column:2/4;font-size:15px;display:flex;gap:4px 10px;flex-wrap:wrap;align-items:baseline}
+.verdict .others{font-size:13px;color:var(--muted)}
+.row .track{grid-column:2/4}
+.late summary{cursor:pointer;font-weight:600;padding:14px 2px;color:var(--muted)}
+.cta{background:#6950a1;color:#fff;border-color:#6950a1}
 .chips{grid-column:2;display:flex;gap:6px;flex-wrap:wrap;font-size:13px;font-weight:600}
 .chip{padding:1px 8px;border-radius:99px;border:1.5px solid currentColor;white-space:nowrap}
 .g{color:var(--go)}.a{color:var(--risk)}.n{color:var(--no)}.x{color:var(--bad)}
@@ -85,6 +90,13 @@ input,select{min-height:44px;border-radius:10px;border:1px solid var(--line);bac
 .res{display:grid;gap:6px;margin-top:8px}
 .res button{text-align:left;font-weight:400;height:auto;padding:8px 12px}
 .res button b{display:block}
+.nearlist{display:grid;gap:6px}
+.nearitem{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;border:1px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer}
+.nearitem input{width:22px;height:22px;min-height:0;accent-color:#6950a1}
+.nearitem .note{display:block}
+.wm{font-weight:800;white-space:nowrap}
+.stepper{display:flex;align-items:center;gap:10px;margin:8px 0}.stepper span{flex:1;color:var(--muted);font-size:14px;font-weight:600}.stepper button{width:44px;padding:0;font-size:20px}.stepper b{min-width:64px;text-align:center}
+details summary{cursor:pointer;font-weight:600;margin:10px 0}
 .stops{list-style:none;margin:0;padding:0;position:relative}
 .stops li{padding:8px 0 8px 28px;border-left:3px solid var(--line);margin-left:10px;position:relative;display:flex;justify-content:space-between;gap:10px}
 .stops li::before{content:"";position:absolute;left:-8px;top:13px;width:13px;height:13px;border-radius:50%;background:var(--bg);border:3px solid var(--muted)}
@@ -309,41 +321,51 @@ function best(now) {
 const refs = {};
 function render() {
   const now = Date.now();
-  $('#legend').innerHTML = deps.length ? '<span>Box = the train or bus. Dots = when you\'d reach it if you left now:</span>' + MODES.filter(m => m.k !== 'lift' || cfg.liftOn).map(m => `<span><i style="background:${m.col}"></i>${m.label}</span>`).join('') + '<span>Dot left of the box = you make it.</span>' : '';
+  $('#legend').innerHTML = deps.length ? '<p style="margin:0">Each bar: the coloured box is the bus or train coming towards now (left edge). <b>You</b> marks where you would be if you left now. If You is left of the box, you make it.</p>' : '';
   const board = $('#board');
   if (!deps.length) {
     board.innerHTML = cfg.places.length && !demo
       ? `<div class="empty"><h2>No departures in the next ${cfg.window} minutes</h2><p>${lastErr ? esc(lastErr) : 'Waiting for live data.'}</p></div>`
-      : `<div class="empty"><h2>Add the stops and stations you use</h2><p>Catch It shows every departure you can actually make, walking, running, by bike or with a lift.</p><p><button id="goSetup">Set up my stops</button> <button id="goDemo">See a demo</button></p></div>`;
+      : `<div class="empty"><h2>Which bus or train can you catch?</h2><p>Add the stops near you once. Catch It then shows every departure you can make, walking, running, cycling or with a lift.</p><p><button id="goSetup" class="cta">Find stops near me</button> <button id="goDemo">See a demo</button></p></div>`;
     $('#goSetup')?.addEventListener('click', openSetup);
     $('#goDemo')?.addEventListener('click', () => { demo = true; refresh(); });
   } else {
-    board.innerHTML = deps.map((d, i) => {
+    const rowHtml = (d, i) => {
       const p = placeOf(d.placeId);
-      return `<div class="row${d.cancelled ? ' gone' : ''}" data-i="${i}">
+      return `<div class="row${d.cancelled ? ' gone' : ''}" data-i="${i}" role="button" tabindex="0">
         <div class="badge" style="background:${d.colour}">${esc(shortLine(d))}</div>
         <div class="dest">${esc(d.dest)}<small>${esc(d.platform || '')} · ${esc(p?.name || '')}</small></div>
         <div class="when" data-w="${i}">--<small></small></div>
-        <div class="track" data-t="${i}"><div class="fill"></div><div class="now"></div>${ticks()}
-          ${modesFor(p || {}).map(m => `<div class="mk you" data-m="${m.k}" style="background:${m.col}">${m.short}</div>`).join('')}
-          <div class="mk veh" style="background:${d.colour}">${d.mode === 'bus' ? 'BUS' : 'TRN'}</div></div>
-        <div class="chips" data-c="${i}"></div>
+        <div class="verdict" data-c="${i}"></div>
+        <div class="track" data-t="${i}"><div class="fill"></div><div class="now"></div>${ticks()}<div class="mk you" data-m="walk">You</div><div class="mk veh" style="background:${d.colour}">${d.mode === 'bus' ? 'BUS' : 'TRAIN'}</div></div>
       </div>`;
-    }).join('');
-    board.querySelectorAll('.row').forEach(r => r.addEventListener('click', () => openDetail(deps[+r.dataset.i])));
+    };
+    const ok = [], late = [];
+    deps.forEach((d, i) => { const p = placeOf(d.placeId), v = verdict(d, p, now); (v.cls === 'n' && !d.cancelled ? late : ok).push(rowHtml(d, i)); });
+    board.innerHTML = ok.join('') + (late.length ? `<details class="late"><summary>Too late to catch (${late.length})</summary>${late.join('')}</details>` : '');
+    board.querySelectorAll('.row').forEach(r => { const go = () => openDetail(deps[+r.dataset.i]); r.addEventListener('click', go); r.addEventListener('keydown', e => { if (e.key === 'Enter') go(); }); });
   }
   for (const k in refs) delete refs[k];
   deps.forEach((d, i) => { refs[i] = {w: board.querySelector(`[data-w="${i}"]`), t: board.querySelector(`[data-t="${i}"]`), c: board.querySelector(`[data-c="${i}"]`)}; });
   chips(now); heroDraw(now); foot();
 }
 const scale = s => Math.max(0, Math.min(1, Math.sqrt(Math.max(0, s) / (cfg.window * 60)))) * 100; // square-root time: near minutes get more room
-const ticks = () => [2, 5, 10, 20, 30].filter(m => m < cfg.window).map(m => `<span class="tick" style="left:${scale(m * 60)}%">${m}m</span>`).join('');
+const ticks = () => [5, 10, 20, 30].filter(m => m < cfg.window).map(m => `<span class="tick" style="left:${scale(m * 60)}%">${m} min</span>`).join('');
 const shortLine = d => d.mode === 'bus' ? d.line : d.lineId === 'LE' ? 'GA' : (d.lineId === 'elizabeth' || d.lineId === 'XR') ? 'ELIZ' : String(d.line).slice(0, 5).toUpperCase();
+function verdict(d, p, now) {
+  if (d.cancelled) return {cls: 'x', txt: 'Cancelled' + (d.status ? ' · ' + d.status : '')};
+  let pick = null, top = null;
+  for (const m of modesFor(p)) { const pr = chance(d, p, m.k, now), li = leaveIn(d, p, m.k, now); if (!top || pr > top.pr) top = {m, pr, li}; if (!pick && pr >= cfg.want) pick = {m, pr, li}; }
+  if (pick) return {cls: 'g', m: pick.m, pr: pick.pr, txt: `✓ ${pick.m.label}${pick.li > 30 ? ', leave in ' + mmss(pick.li) : ', go now'}`};
+  if (top && top.pr >= 0.4) return {cls: 'a', m: top.m, pr: top.pr, txt: `${top.m.label} now: ${Math.round(top.pr * 100)}% chance`};
+  return {cls: 'n', m: top?.m, pr: top?.pr || 0, txt: 'Too late to catch'};
+}
 function chips(now) {
   deps.forEach((d, i) => {
-    const r = refs[i]; if (!r?.c) return; const p = placeOf(d.placeId);
-    if (d.cancelled) { r.c.innerHTML = `<span class="chip x">Cancelled${d.status ? ' · ' + esc(d.status) : ''}</span>`; return; }
-    r.c.innerHTML = modesFor(p).map(m => { const pr = chance(d, p, m.k, now); return `<span class="chip ${cls(pr)}">${m.label} ${Math.round(pr * 100)}%</span>`; }).join('') + (d.status && !/on time/i.test(d.status) ? `<span class="chip a">${esc(d.status)}</span>` : '');
+    const r = refs[i]; if (!r?.c) return; const p = placeOf(d.placeId), v = verdict(d, p, now);
+    const others = d.cancelled ? '' : modesFor(p).filter(m => m !== v.m).map(m => `${m.label} ${Math.round(chance(d, p, m.k, now) * 100)}%`).join(' · ');
+    r.c.innerHTML = `<b class="${v.cls}">${esc(v.txt)}</b>${others ? `<span class="others">${esc(others)}</span>` : ''}${d.status && !/on time|cancel/i.test(d.status) ? ` <span class="chip a">${esc(d.status)}</span>` : ''}`;
+    const y = r.t?.querySelector('.you'); if (y && v.m) { y.dataset.m = v.m.k; y.style.background = v.m.col; y.textContent = 'You'; y.title = v.m.label; y.style.display = ''; } else if (y) y.style.display = 'none';
   });
 }
 function heroDraw(now) {
@@ -484,52 +506,106 @@ function connections(d, stops) {
 function openSetup() { drawSetup(); $('#setup').classList.add('open'); }
 function closeSetup() { $('#setup').classList.remove('open'); save(); demo = false; demoSeed = []; refresh(); weather(); }
 $('#setup').addEventListener('click', e => { if (e.target.id === 'setup') closeSetup(); });
+let near = [];        // nearby stops found for the current home point
+let STN = null;       // National Rail station codes (CRS), loaded on demand
+async function crsFor(lat, lon) {
+  try { if (!STN) STN = await (await fetch('data/stations.json')).json(); } catch (e) { return ''; }
+  let best = null, bd = 0.0045; for (const s of STN) { const d = Math.hypot(s[1] - lat, (s[2] - lon) * 0.62); if (d < bd) { bd = d; best = s; } }
+  return best ? best[0] : '';
+}
+const walkMin = m => Math.max(1, Math.round(m * 1.3 / 80));   // straight-line metres to walking minutes (streets add ~30%)
+const hav2 = (a, b, c, d) => { const R = 6371000, p = Math.PI / 180, x = Math.sin((c - a) * p / 2) ** 2 + Math.cos(a * p) * Math.cos(c * p) * Math.sin((d - b) * p / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(x)); };
 function drawSetup() {
   const s = $('#setupSheet');
-  s.innerHTML = `<button class="close" id="sClose">Done</button><h2>Your stops and stations</h2>
-  <p class="note">Saved only in this browser. Nothing about you is sent anywhere except the stop codes needed to ask TfL and National Rail for departures.</p>
-  <div id="places">${cfg.places.map(placeCard).join('') || '<p class="note">No stops yet. Search below.</p>'}</div>
-  <h3>Add a stop or station</h3>
-  <div class="field"><label for="q">Search TfL stops and stations (bus, Elizabeth line, Tube, rail)</label><input id="q" placeholder="e.g. a station or bus stop name" autocomplete="off"></div>
-  <div class="res" id="res"></div>
-  <h3>How fast you are</h3>
+  const has = id => cfg.places.some(p => p.tflId === id);
+  s.innerHTML = `<button class="close" id="sClose">Done</button><h2>Set up in three steps</h2>
+  <p class="note">Everything stays in this browser.</p>
+  <h3>1. Where do you usually leave from?</h3>
+  <div class="grid2"><button id="geo" class="cta">Use my location</button><div class="field" style="margin:0"><input id="pc" placeholder="or type a postcode" autocomplete="postal-code"></div></div>
+  <p class="note" id="homeNote">${cfg.home ? 'Home point saved (rounded to about 100 m).' : 'Used only to find stops near you and estimate walking minutes.'}</p>
+  <h3>2. Tick the stops and stations you use</h3>
+  <div id="near">${near.length ? nearHtml(has) : '<p class="note">Your nearby stops appear here after step 1.</p>'}</div>
+  <details><summary>Can't find it? Search by name</summary><div class="field"><input id="q" placeholder="Stop or station name" autocomplete="off"></div><div class="res" id="res"></div></details>
+  <h3>3. Check your walking times</h3>
+  <div id="places">${cfg.places.map(placeCard).join('') || '<p class="note">Nothing ticked yet.</p>'}</div>
+  <details><summary>More settings</summary>
   <div class="grid2">
     <div class="field"><label for="fRun">Running time as share of walking</label><input id="fRun" type="number" step="0.05" min="0.2" max="1" value="${cfg.f.run}"></div>
     <div class="field"><label for="fBike">Cycling time as share of walking</label><input id="fBike" type="number" step="0.05" min="0.1" max="1" value="${cfg.f.bike}"></div>
     <div class="field"><label for="fDrive">Driving time as share of walking</label><input id="fDrive" type="number" step="0.05" min="0.05" max="1" value="${cfg.f.drive}"></div>
-    <div class="field"><label for="lp">Lift: minutes until your friend can pick you up</label><input id="lp" type="number" min="0" max="60" value="${cfg.liftPickup}"></div>
-    <div class="field"><label for="buf">Safety buffer (seconds before departure)</label><input id="buf" type="number" min="0" max="180" value="${cfg.buffer}"></div>
-    <div class="field"><label for="win">Show departures for the next (minutes)</label><input id="win" type="number" min="10" max="120" value="${cfg.window}"></div>
+    <div class="field"><label for="lp">Lift: minutes until pickup</label><input id="lp" type="number" min="0" max="60" value="${cfg.liftPickup}"></div>
+    <div class="field"><label for="buf">Safety buffer (seconds)</label><input id="buf" type="number" min="0" max="180" value="${cfg.buffer}"></div>
+    <div class="field"><label for="win">Show the next (minutes)</label><input id="win" type="number" min="10" max="120" value="${cfg.window}"></div>
   </div>
-  <p class="note">Your learned times replace these guesses: tap "I'm going", then "I'm on the platform" when you arrive.</p>
   <h3>Greater Anglia and other National Rail trains</h3>
-  <p class="note">TfL's feed covers buses, the Elizabeth line and the Tube. For other trains, add your free Live Departure Board key from the Rail Data Marketplace (raildata.org.uk), then add a station's three-letter code to its card. The key stays in this browser.</p>
+  <p class="note">Buses, the Elizabeth line and the Tube work without this. For other trains, get a free "Live Departure Board" key at raildata.org.uk and paste it here. Station codes are filled in for you.</p>
   <div class="field"><label for="dk">Rail Data Marketplace consumer key</label><input id="dk" type="password" value="${esc(cfg.darwinKey)}" autocomplete="off"></div>
-  <p class="note">Data: TfL Unified API (Powered by TfL Open Data), National Rail Darwin, Open-Meteo weather.</p>`;
+  </details>
+  <p class="note">Data: Powered by TfL Open Data, National Rail Darwin, postcodes.io, Open-Meteo. Station codes © Trainline EU and contributors (ODbL).</p>`;
   $('#sClose').addEventListener('click', closeSetup);
   const num = (id, fn) => $('#' + id).addEventListener('change', e => { const v = parseFloat(e.target.value); if (!isNaN(v)) { fn(v); save(); } });
   num('fRun', v => cfg.f.run = v); num('fBike', v => cfg.f.bike = v); num('fDrive', v => cfg.f.drive = v);
   num('lp', v => cfg.liftPickup = v); num('buf', v => cfg.buffer = v); num('win', v => cfg.window = v);
   $('#dk').addEventListener('change', e => { cfg.darwinKey = e.target.value.trim(); cfg.darwinPath = ''; save(); });
+  $('#geo').addEventListener('click', () => {
+    $('#homeNote').textContent = 'Asking for your location…';
+    if (!navigator.geolocation) { $('#homeNote').textContent = 'Location is not available here; type a postcode instead.'; return; }
+    navigator.geolocation.getCurrentPosition(pos => setHome(pos.coords.latitude, pos.coords.longitude), () => { $('#homeNote').textContent = 'Location was blocked; type a postcode instead.'; }, {enableHighAccuracy: false, timeout: 10000});
+  });
+  let tp; $('#pc').addEventListener('input', e => { clearTimeout(tp); tp = setTimeout(() => postcode(e.target.value), 600); });
   let tq; $('#q').addEventListener('input', e => { clearTimeout(tq); tq = setTimeout(() => search(e.target.value), 350); });
-  bindPlaces();
+  bindNear(); bindPlaces();
+}
+async function postcode(v) {
+  v = v.trim(); if (v.replace(/\s/g, '').length < 5) return;
+  try { const r = await getJSON('https://api.postcodes.io/postcodes/' + encodeURIComponent(v)); setHome(r.result.latitude, r.result.longitude); }
+  catch (e) { $('#homeNote').textContent = 'Postcode not found yet, keep typing.'; }
+}
+async function setHome(lat, lon) {
+  cfg.home = [+lon.toFixed(3), +lat.toFixed(3)]; save();
+  $('#homeNote').textContent = 'Finding stops near you…';
+  try {
+    const [buses, rail] = await Promise.all([
+      getJSON(`${TFL}/StopPoint?lat=${lat}&lon=${lon}&stopTypes=NaptanPublicBusCoachTram&radius=600`),
+      getJSON(`${TFL}/StopPoint?lat=${lat}&lon=${lon}&stopTypes=NaptanMetroStation,NaptanRailStation&radius=2500`)]);
+    near = [...(rail.stopPoints || []), ...(buses.stopPoints || []).filter(s => (s.lines || []).length)].map(s => ({
+      id: s.naptanId, name: s.commonName.replace(/ (Rail|Underground|DLR) Station$/, ''), letter: s.indicator && !/^->/.test(s.indicator) ? s.indicator : '',
+      towards: (s.additionalProperties || []).find(a => a.key === 'Towards')?.value || '', lines: (s.lines || []).map(l => l.name), modes: s.modes || [],
+      dist: hav2(lat, lon, s.lat, s.lon), lat: s.lat, lon: s.lon, rail: s.stopType !== 'NaptanPublicBusCoachTram'})).sort((a, b) => (b.rail - a.rail) || a.dist - b.dist).slice(0, 18);
+    $('#homeNote').textContent = 'Home point saved (rounded to about 100 m). Tick what you use below.';
+    $('#near').innerHTML = nearHtml(id => cfg.places.some(p => p.tflId === id)); bindNear();
+  } catch (e) { $('#homeNote').textContent = 'Could not reach TfL: ' + e.message; }
+}
+function nearHtml(has) {
+  return '<div class="nearlist">' + near.map((s, i) => `<label class="nearitem"><input type="checkbox" data-n="${i}" ${has(s.id) ? 'checked' : ''}>
+    <span><b>${esc(s.name)}${s.letter ? ' · ' + esc(s.letter) : ''}</b><span class="note">${s.rail ? esc(s.lines.join(', ')) : 'Buses ' + esc(s.lines.slice(0, 8).join(', ')) + (s.towards ? ' · towards ' + esc(s.towards) : '')}</span></span>
+    <span class="wm">${walkMin(s.dist)} min walk</span></label>`).join('') + '</div>';
+}
+function bindNear() {
+  document.querySelectorAll('[data-n]').forEach(c => c.addEventListener('change', async () => {
+    const s = near[+c.dataset.n];
+    if (!c.checked) { cfg.places = cfg.places.filter(p => p.tflId !== s.id); save(); $('#places').innerHTML = cfg.places.map(placeCard).join(''); bindPlaces(); return; }
+    const hasTfl = s.modes.some(m => ['elizabeth-line', 'tube', 'overground', 'dlr', 'tram', 'bus'].includes(m));
+    const crs = s.modes.includes('national-rail') ? await crsFor(s.lat, s.lon) : '';
+    addPlace({name: s.name + (s.letter ? ' (' + s.letter + ')' : ''), tflId: hasTfl ? s.id : '', crs, lat: s.lat, lon: s.lon, walk: walkMin(s.dist), platform: s.rail ? 2 : 0.5, bus: !s.rail}, true);
+  }));
 }
 function placeCard(p) {
-  return `<div class="place" data-id="${esc(p.id)}"><header><span>${esc(p.name)}</span><button data-del="${esc(p.id)}">Remove</button></header>
-  <div class="grid2">
-    <div class="field"><label>Walk from home (minutes)</label><input type="number" min="0" max="90" step="0.5" data-k="walk" value="${esc(p.walk)}"></div>
-    <div class="field"><label>Entrance to platform or stop (minutes)</label><input type="number" min="0" max="20" step="0.5" data-k="platform" value="${esc(p.platform)}"></div>
-    <div class="field"><label>Only show (routes, destinations or platforms, comma separated)</label><input data-k="only" value="${esc(p.only || '')}" placeholder="e.g. 103, Heathrow, Platform 4"></div>
-    <div class="field"><label>National Rail station code (optional)</label><input data-k="crs" maxlength="3" value="${esc(p.crs || '')}" placeholder="3 letters"></div>
-  </div>
+  return `<div class="place" data-id="${esc(p.id)}"><header><span>${esc(p.name)}</span><button data-del="${esc(p.id)}" aria-label="Remove ${esc(p.name)}">Remove</button></header>
+  <div class="stepper"><span>Walk from home</span><button data-step="-1" aria-label="One minute less">−</button><b data-wv>${esc(p.walk)} min</b><button data-step="1" aria-label="One minute more">+</button></div>
   <div class="modes">${MODES.map(m => `<label><input type="checkbox" data-mode="${m.k}" ${p.modes?.[m.k] !== false ? 'checked' : ''}>${m.label}</label>`).join('')}</div>
-  ${p.learned && Object.keys(p.learned).length ? `<p class="note">Learned: ${Object.entries(p.learned).map(([k, v]) => esc(k) + ' ' + v.toFixed(1) + ' min').join(', ')}</p>` : ''}</div>`;
+  <details><summary>Options</summary><div class="grid2">
+    <div class="field"><label>Entrance to platform or stop (minutes)</label><input type="number" min="0" max="20" step="0.5" data-k="platform" value="${esc(p.platform)}"></div>
+    <div class="field"><label>Only show (routes, places or platforms)</label><input data-k="only" value="${esc(p.only || '')}" placeholder="e.g. 103, Heathrow"></div>
+    <div class="field"><label>National Rail code</label><input data-k="crs" maxlength="3" value="${esc(p.crs || '')}"></div></div></details>
+  ${p.learned && Object.keys(p.learned).length ? `<p class="note">Learned from your trips: ${Object.entries(p.learned).map(([k, v]) => esc(k) + ' ' + v.toFixed(1) + ' min').join(', ')}</p>` : ''}</div>`;
 }
 function bindPlaces() {
   document.querySelectorAll('.place').forEach(el => {
     const p = cfg.places.find(q => q.id === el.dataset.id); if (!p) return;
     el.querySelectorAll('[data-k]').forEach(i => i.addEventListener('change', () => { const k = i.dataset.k; p[k] = (k === 'only' || k === 'crs') ? i.value.trim() : parseFloat(i.value) || 0; save(); }));
     el.querySelectorAll('[data-mode]').forEach(i => i.addEventListener('change', () => { p.modes = p.modes || {}; p.modes[i.dataset.mode] = i.checked; save(); }));
+    el.querySelectorAll('[data-step]').forEach(b => b.addEventListener('click', () => { p.walk = Math.max(0, (+p.walk || 0) + +b.dataset.step); el.querySelector('[data-wv]').textContent = p.walk + ' min'; save(); }));
     el.querySelector('[data-del]').addEventListener('click', () => { cfg.places = cfg.places.filter(q => q !== p); save(); drawSetup(); });
   });
 }
@@ -551,16 +627,19 @@ async function pick(m) {
       const sp = await getJSON(TFL + '/StopPoint/' + encodeURIComponent(m.id));
       const kids = (sp.children || []).filter(c => (c.lines || []).length);
       res.innerHTML = '<p class="note">Pick the stop on your side of the road:</p>' + kids.map((c, i) => { const tw = (c.additionalProperties || []).find(a => a.key === 'Towards')?.value || ''; return `<button data-i="${i}"><b>${esc(c.indicator || c.commonName)} · ${esc(c.commonName)}</b><span class="note">Towards ${esc(tw)} · routes ${esc(c.lines.map(l => l.name).join(', '))}</span></button>`; }).join('');
-      res.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { const c = kids[+b.dataset.i]; addPlace({name: c.commonName + ' (' + (c.indicator || '') + ')', tflId: c.naptanId, lat: c.lat, lon: c.lon, walk: 4, platform: 0.5, bus: true}); }));
+      res.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { const c = kids[+b.dataset.i]; const d = cfg.home ? hav2(cfg.home[1], cfg.home[0], c.lat, c.lon) : 300; addPlace({name: c.commonName + ' (' + (c.indicator || '') + ')', tflId: c.naptanId, lat: c.lat, lon: c.lon, walk: walkMin(d), platform: 0.5, bus: true}); }));
     } catch (e) { res.innerHTML = '<p class="err">' + esc(e.message) + '</p>'; }
     return;
   }
   const hasTfl = (m.modes || []).some(x => ['elizabeth-line', 'tube', 'overground', 'dlr', 'tram'].includes(x));
-  addPlace({name: m.name.replace(/ (Rail|Underground) Station$/, ''), tflId: hasTfl ? m.id : '', lat: m.lat, lon: m.lon, walk: 10, platform: 2});
+  const crs = (m.modes || []).includes('national-rail') ? await crsFor(m.lat, m.lon) : '';
+  const d = cfg.home ? hav2(cfg.home[1], cfg.home[0], m.lat, m.lon) : 800;
+  addPlace({name: m.name.replace(/ (Rail|Underground) Station$/, ''), tflId: hasTfl ? m.id : '', crs, lat: m.lat, lon: m.lon, walk: walkMin(d), platform: 2});
 }
-function addPlace(o) {
-  cfg.places.push(Object.assign({id: 'p' + Date.now().toString(36), modes: {walk: true, run: true, bike: !o.bus, lift: !o.bus}, learned: {}}, o));
-  save(); drawSetup(); $('#q')?.focus();
+function addPlace(o, quiet) {
+  cfg.places.push(Object.assign({id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), modes: {walk: true, run: true, bike: !o.bus, lift: !o.bus}, learned: {}}, o));
+  save();
+  if (quiet) { $('#places').innerHTML = cfg.places.map(placeCard).join(''); bindPlaces(); } else drawSetup();
 }
 
 /* ---------- wiring ---------- */

@@ -7,7 +7,7 @@
 | Page | What it does |
 |---|---|
 | `index.html` Board | Live departures (TfL buses, Elizabeth line, Tube, Overground; National Rail with your own free key), a race strip per departure, catch chance per mode, leave-now countdown, follow-a-bus, bus-to-train connection chances, platform prediction, learns your real walking/running times |
-| `map.html` Map | Every live vehicle on its real road or track, 3D buildings lit by the real sun, ride-along window view, which side to sit on (sun glare + parks and water from OpenStreetMap) |
+| `map.html` Map | Map, Satellite or 3D world (satellite imagery + real terrain + 3D buildings + real-time sky). Every live bus and train as a 3D model on its real road or OpenStreetMap track. Ride a real vehicle live (outside chase cam or left/right/front window) or a fast preview; which side to sit on (sun glare + parks and water) |
 | `station.html` Station | Entrance-to-platform time from OpenStreetMap indoor data: quickest, step-free or no-lift routes, crowd-adjusted walking speed, live TfL lift problems |
 
 ## The maths inside
@@ -20,4 +20,6 @@
 ## Privacy and cost
 Your stops, times and keys are saved only in your browser (localStorage). No server, no paid APIs, no secret keys in the code.
 
-Data: Powered by TfL Open Data · National Rail Darwin (Rail Data Marketplace, your own key) · © OpenStreetMap contributors · OpenFreeMap · Open-Meteo.
+Data: Powered by TfL Open Data · Imagery © Esri, Maxar, Earthstar Geographics · Terrain: AWS Terrain Tiles · postcodes.io · National Rail station codes © Trainline EU and contributors (ODbL)
+
+Also: Powered by TfL Open Data · National Rail Darwin (Rail Data Marketplace, your own key) · © OpenStreetMap contributors · OpenFreeMap · Open-Meteo.
