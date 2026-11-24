@@ -199,7 +199,7 @@ details summary{cursor:pointer;font-weight:600;margin:10px 0}
 @media(prefers-reduced-motion:reduce){.busnow{transition:none}}
 </style>
 <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="ui.css?v=1795558196">
+<link rel="stylesheet" href="ui.css?v=1795559079">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -228,6 +228,7 @@ details summary{cursor:pointer;font-weight:600;margin:10px 0}
   <p class="sum" id="sum"></p>
   <div class="strip" id="strip" aria-hidden="true"></div>
   <section id="hero" class="call calm" aria-live="polite"></section>
+  <button class="zopen" id="zopen" hidden>Show the catch zone map</button>
   <div class="zone" id="zone" hidden><div class="ztabs" role="group" aria-label="Map type"><button data-z="rings" aria-pressed="true">Catch rings</button><button data-z="soon" aria-pressed="false">Soonest</button><button data-z="time" aria-pressed="false">Time map</button></div><div id="tmap" hidden></div><div id="zmap" role="img" aria-label="Catch zone map: how far from the station you could be and still make this departure"></div><p class="zcap" id="zcap"></p><p class="mcred">Map © OpenFreeMap, © OpenStreetMap contributors</p></div>
   <div id="tripBox"></div>
   <div id="modesBox"><p class="lbl">How you can get there today</p><div class="modes" id="modes"></div></div>
@@ -627,7 +628,7 @@ function render() {
          <p>Journey planners only show what you can reach walking. Catch It works out every bus and train you can still make by walking, running, cycling or getting a lift, live, second by second.</p>
          <p><button id="goSetup" class="cta">Find stops near me</button> <button id="goDemo">See a demo</button></p></div>`;
     $('#goSetup')?.addEventListener('click', openSetup);
-    $('#goDemo')?.addEventListener('click', () => { demo = true; refresh(); });
+    $('#goDemo')?.addEventListener('click', () => { demo = true; refresh(); setTimeout(() => { let seen = '1'; try { seen = localStorage.getItem('catchit.tour'); } catch (e) {} if (!seen && !tourRun) tour(0); }, 1200); });
   } else {
     const rowHtml = (d, i) => {
       const p = placeOf(d.placeId);
@@ -674,6 +675,7 @@ function drawModes() {
   box.innerHTML = MODES.map(m => { const on = m.k === 'lift' ? !!cfg.liftOn : cfg.today?.[m.k] !== false; return `<button data-k="${m.k}" aria-pressed="${on}" title="${m.label}">${svgI(m.k)}${m.label}</button>`; }).join('');
   box.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { const k = b.dataset.k; if (k === 'lift') { cfg.liftOn = !cfg.liftOn; syncLift(); } else { cfg.today = Object.assign({}, cfg.today); cfg.today[k] = cfg.today[k] === false; } save(); render(); }));
 }
+let heroMore = false;
 function heroDraw(now) {
   const h = $('#hero'), b = best(now);
   zoneDraw(b);
@@ -691,7 +693,8 @@ function heroDraw(now) {
     </div>
     <p class="raceTxt" id="raceTxt"></p>
     <div class="odds"><div class="bar"><i id="prBar" style="width:${Math.round(b.pr * 100)}%;background:${ok ? '#3dd39a' : '#e0a21f'}"></i></div><span><span id="heroPr">${Math.round(b.pr * 100)}</span>% chance${demo ? ' (demo)' : ''}</span></div>
-    <div class="acts"><button class="main" id="goBtn">I'm going</button><button id="remBtn">${remind ? 'Reminder set' : 'Remind me'}</button><button id="snzBtn" title="Hide this one and show the next">Snooze</button>${b.m.k === 'lift' || cfg.liftOn ? '<button id="liftAsk">Ask a friend for a lift</button>' : ''}${demo ? '<button id="exitDemo">Exit demo</button>' : ''}<button id="missBtn">Missed it?</button><button id="shareBtn">Share my ETA</button></div>
+    <div class="acts"><button class="main" id="goBtn">I'm going</button><button id="remBtn">${remind ? 'Reminder set' : 'Remind me'}</button><button id="moreBtn" aria-expanded="${!!heroMore}">${heroMore ? 'Less' : 'More'}</button></div>
+    <div class="acts more2" ${heroMore ? '' : 'hidden'}><button id="snzBtn" title="Hide this one and show the next">Snooze</button><button id="missBtn">Missed it?</button><button id="shareBtn">Share my ETA</button>${b.m.k === 'lift' || cfg.liftOn ? '<button id="liftAsk">Ask a friend for a lift</button>' : ''}${demo ? '<button id="exitDemo">Exit demo</button>' : ''}</div>
     ${alts.length ? `<p class="lbl" style="color:inherit;opacity:.7;margin:16px 0 0">Plan B</p><div class="alts">${alts.map(o => `<button class="alt" data-k="${esc(o.x.key)}"><span><span class="pill" style="background:${o.x.colour};height:20px;font-size:11px;min-width:30px">${esc(shortLine(o.x))}</span> ${hhmm(o.x.t)}</span><small class="${o.v.cls}">${esc(o.v.txt.replace('✓ ', ''))}</small></button>`).join('')}</div>` : ''}`;
   h.dataset.key = d.key; h.dataset.m = b.m.k;
   $('#goBtn').addEventListener('click', () => startTrip(b.p, b.m.k, b.d));
@@ -699,6 +702,7 @@ function heroDraw(now) {
   $('#remBtn').addEventListener('click', () => setRemind(b));
   $('#snzBtn')?.addEventListener('click', () => snooze(b.d.key));
   $('#missBtn')?.addEventListener('click', () => missedPlan(b.d));
+  $('#moreBtn')?.addEventListener('click', () => { heroMore = !heroMore; heroDraw(Date.now()); });
   $('#shareBtn')?.addEventListener('click', () => shareEta(b.d, b.p));
   $('#exitDemo')?.addEventListener('click', exitDemo);
   h.querySelectorAll('.alt').forEach(a => a.addEventListener('click', () => { const x = deps.find(q => q.key === a.dataset.k); if (x) openDetail(x); }));
@@ -829,8 +833,9 @@ function soonTick(now, vw) {
 }
 async function zoneDraw(b) {
   const box = $('#zone');
-  if (!b || !b.p?.lat || demo && !b.p.lat) { box.hidden = true; Z.b = null; return; }
-  box.hidden = false; Z.b = b; if (Z.key !== b.d.key) { Z.key = b.d.key; Z.fit = true; }
+  if (!b || !b.p?.lat || demo && !b.p.lat) { box.hidden = true; $('#zopen').hidden = true; Z.b = null; return; }
+  Z.b = b; if (!Z.open) { $('#zopen').hidden = false; box.hidden = true; return; }
+  $('#zopen').hidden = true; box.hidden = false; if (Z.key !== b.d.key) { Z.key = b.d.key; Z.fit = true; }
   try { await loadML(); } catch (e) { box.hidden = true; return; }
   if (!Z.map) {
     Z.map = new maplibregl.Map({container: 'zmap', style: 'https://tiles.openfreemap.org/styles/liberty', center: [b.p.lon, b.p.lat], zoom: 14, dragRotate: false, pitchWithRotate: false, touchPitch: false, attributionControl: false});
@@ -886,6 +891,8 @@ function zoneTick() {
   }
 }
 setInterval(zoneTick, 1000);
+$('#zopen').addEventListener('click', () => { Z.open = true; zoneDraw(Z.b); try { localStorage.setItem('catchit.zone', '1'); } catch (e) {} });
+try { Z.open = localStorage.getItem('catchit.zone') === '1'; } catch (e) {}
 /* Time map: a radial cartogram centred on you. Angle = the real compass direction of each stop;
    radius = minutes until you could be on board there (walk + platform + wait for the first departure you can make).
    Grey dots show where the stops really are, so you can see how time bends the map. */
@@ -1316,6 +1323,7 @@ function drawSetup() {
   <details><summary>Can't find it? Search by name</summary><div class="field"><input id="q" placeholder="Stop or station name" autocomplete="off"></div><div class="res" id="res"></div></details>
   <h3>3. Check your walking times</h3>
   <div id="places">${cfg.places.map(placeCard).join('') || '<p class="note">Nothing ticked yet.</p>'}</div>
+  <p><button id="tourBtn">Show the tour again</button></p>
   <details><summary>More settings</summary>
   <div class="grid2">
     <div class="field"><label for="fRun">Running time as share of walking</label><input id="fRun" type="number" step="0.05" min="0.2" max="1" value="${cfg.f.run}"></div>
@@ -1336,6 +1344,7 @@ function drawSetup() {
   const num = (id, fn) => $('#' + id).addEventListener('change', e => { const v = parseFloat(e.target.value); if (!isNaN(v)) { fn(v); save(); } });
   num('fRun', v => cfg.f.run = v); num('fBike', v => cfg.f.bike = v); num('fDrive', v => cfg.f.drive = v);
   num('lp', v => cfg.liftPickup = v); num('buf', v => cfg.buffer = v); num('win', v => cfg.window = v);
+  $('#tourBtn')?.addEventListener('click', () => { closeSetup(); setTimeout(() => tour(0), 400); });
   $('#kg')?.addEventListener('change', e => { cfg.kg = +e.target.value || 70; save(); });
   $('#hv')?.addEventListener('change', e => { cfg.hourValue = +e.target.value || 0; save(); });
   $('#dk').addEventListener('change', e => { cfg.darwinKey = e.target.value.trim(); cfg.darwinPath = ''; save(); });
@@ -1456,6 +1465,32 @@ function drawStory() {
     Object.entries(days).map(([k, list]) => `<h3>${esc(k)}</h3><ol class="tl">${list.map(s => `<li><span class="tt">${hhmm(s.at - s.mins * 60000)}</span><span><b>${verb[s.mode] || 'Went'} to ${esc(s.place)}</b> in ${Math.round(s.mins)} min${s.line ? `, caught the ${s.dep ? hhmm(s.dep) + ' ' : ''}${esc(s.line)}` : ''}${s.saved >= 1 ? `<br><small class="g">${Math.round(s.saved)} min faster than walking</small>` : ''}<br><small class="note">${Math.round(kcal(s))} kcal${s.dist ? ', ' + (s.dist >= 1000 ? (s.dist / 1000).toFixed(1) + ' km' : s.dist + ' m') : ''}</small></span></li>`).join('')}</ol>`).join('');
 }
 drawStory();
+/* ---------- first-time tour: four steps, each spotlighting the real thing on screen ---------- */
+const TOUR = [
+  {sel: '#where', t: 'Where to?', d: 'Search any place. Catch It finds trains other apps hide, the ones you can still make if you run, cycle or get a lift.'},
+  {sel: '#hero', t: 'Your next catch', d: 'The big number is when to leave. The line underneath is a race between you and the train to the platform.'},
+  {sel: '#modesBox', t: 'How are you travelling today?', d: 'Turn walking, running, cycling or a lift on and off. Every time and chance updates straight away.'},
+  {sel: '#board', t: 'Everything you can catch', d: 'Tap any departure for the details. Tap I\'m going and the run coach counts you down, with your voice and vibration.'}
+];
+let tourRun = 0;
+function tour(i = 0, run) {
+  if (i === 0 && !run) { run = ++tourRun; } else if (run !== tourRun) return;   // only one tour at a time
+  document.querySelectorAll('.tour').forEach(x => x.remove());
+  const s = TOUR[i]; if (!s) { tourRun++; try { localStorage.setItem('catchit.tour', '1'); } catch (e) {} return; }
+  const el = $(s.sel); if (!el || el.hidden || !el.offsetHeight) return tour(i + 1, run);
+  el.scrollIntoView({block: 'center'});
+  setTimeout(() => {
+    if (run !== tourRun) return; document.querySelectorAll('.tour').forEach(x => x.remove());
+    const r = el.getBoundingClientRect(), pad = 8, box = document.createElement('div'); box.className = 'tour';
+    const tall = r.height > innerHeight * 0.4, below = r.bottom + 190 < innerHeight;
+    box.innerHTML = `<div class="tspot" style="left:${r.left - pad}px;top:${r.top - pad}px;width:${r.width + pad * 2}px;height:${Math.min(r.height, innerHeight * 0.6) + pad * 2}px"></div>
+      <div class="tcard" role="dialog" aria-label="${esc(s.t)}" style="${tall ? 'bottom:' + (innerWidth < 701 ? 84 : 20) : below ? 'top:' + Math.min(innerHeight - 200, r.top + Math.min(r.height, innerHeight * 0.6) + 18) : 'top:' + Math.max(12, r.top - 200)}px"><small>${i + 1} of ${TOUR.length}</small><h3>${esc(s.t)}</h3><p>${esc(s.d)}</p><div><button id="tSkip">Skip</button><button class="main" id="tNext">${i === TOUR.length - 1 ? 'Done' : 'Next'}</button></div></div>`;
+    document.body.appendChild(box);
+    $('#tNext').onclick = () => tour(i + 1, run); $('#tSkip').onclick = () => tour(99, run); $('#tNext').focus();
+  }, 350);
+}
+window.catchTour = () => tour(0);
+setTimeout(() => { let seen = '1'; try { seen = localStorage.getItem('catchit.tour'); } catch (e) {} if (!seen && !tourRun && $('#hero') && !$('#hero').hidden && $('#goBtn')) tour(0); }, 2500);
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 let installEv = null; addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEv = e; $('#installBtn').hidden = false; });
 $('#installBtn').addEventListener('click', async () => { if (!installEv) return; installEv.prompt(); await installEv.userChoice; installEv = null; $('#installBtn').hidden = true; });
